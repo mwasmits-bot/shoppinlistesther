@@ -199,11 +199,16 @@ STORES.forEach((s) => {
 subjectSelect.addEventListener("change", () => {
   storeWrap.hidden = subjectSelect.value !== "Boodschappen";
   customSubjectWrap.hidden = subjectSelect.value !== "Overig";
+  saveDraft();
 });
 
 storeSelect.addEventListener("change", () => {
   storeOtherWrap.hidden = storeSelect.value !== "Anders";
+  saveDraft();
 });
+
+storeOtherInput.addEventListener("input", saveDraft);
+customSubjectInput.addEventListener("input", saveDraft);
 
 const itemNameInput = document.getElementById("item-name-input");
 const itemExtraToggle = document.getElementById("item-extra-toggle");
@@ -216,6 +221,38 @@ const draftEmpty = document.getElementById("draft-empty");
 const sendListBtn = document.getElementById("send-list-btn");
 
 let draftItems = [];
+
+/* Concept wordt automatisch lokaal bewaard, zodat je er dagenlang
+   tussendoor aan kunt verder werken voordat je 'm verstuurt. */
+const DRAFT_KEY = "boodschappenlijst_draft";
+
+function saveDraft() {
+  localStorage.setItem(DRAFT_KEY, JSON.stringify({
+    subject: subjectSelect.value,
+    store: storeSelect.value,
+    storeOther: storeOtherInput.value,
+    customSubject: customSubjectInput.value,
+    items: draftItems
+  }));
+}
+
+function loadDraft() {
+  let draft;
+  try { draft = JSON.parse(localStorage.getItem(DRAFT_KEY)); } catch { /* corrupt draft, ignore */ }
+  if (!draft) return;
+  subjectSelect.value = draft.subject || "Boodschappen";
+  storeSelect.value = draft.store || "";
+  storeOtherInput.value = draft.storeOther || "";
+  customSubjectInput.value = draft.customSubject || "";
+  draftItems = Array.isArray(draft.items) ? draft.items : [];
+  storeWrap.hidden = subjectSelect.value !== "Boodschappen";
+  customSubjectWrap.hidden = subjectSelect.value !== "Overig";
+  storeOtherWrap.hidden = storeSelect.value !== "Anders";
+}
+
+function clearDraft() {
+  localStorage.removeItem(DRAFT_KEY);
+}
 
 itemExtraToggle.addEventListener("click", () => {
   itemExtraWrap.hidden = !itemExtraWrap.hidden;
@@ -238,6 +275,7 @@ function addDraftItem() {
   itemImageInput.value = "";
   itemExtraWrap.hidden = true;
   renderDraftList();
+  saveDraft();
   itemNameInput.focus();
 }
 
@@ -274,6 +312,7 @@ function renderDraftList() {
     removeBtn.addEventListener("click", () => {
       draftItems = draftItems.filter((i) => i.id !== item.id);
       renderDraftList();
+      saveDraft();
     });
 
     li.appendChild(left);
@@ -282,7 +321,24 @@ function renderDraftList() {
   });
   sendListBtn.disabled = draftItems.length === 0;
 }
+loadDraft();
 renderDraftList();
+
+const clearDraftBtn = document.getElementById("clear-draft-btn");
+clearDraftBtn.addEventListener("click", () => {
+  if (draftItems.length === 0) return;
+  if (!confirm("Concept wissen? Alles wat je tot nu toe hebt toegevoegd gaat dan verloren.")) return;
+  draftItems = [];
+  subjectSelect.value = "Boodschappen";
+  storeSelect.value = "";
+  storeOtherInput.value = "";
+  customSubjectInput.value = "";
+  storeWrap.hidden = false;
+  customSubjectWrap.hidden = true;
+  storeOtherWrap.hidden = true;
+  clearDraft();
+  renderDraftList();
+});
 
 sendListBtn.addEventListener("click", async () => {
   const subject = subjectSelect.value === "Overig" ? customSubjectInput.value.trim() : subjectSelect.value;
@@ -312,6 +368,7 @@ sendListBtn.addEventListener("click", async () => {
     storeWrap.hidden = false;
     customSubjectWrap.hidden = true;
     storeOtherWrap.hidden = true;
+    clearDraft();
 
     if (emailResult.sent) {
       showToast("Lijst verstuurd en mail verzonden ✅");
