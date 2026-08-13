@@ -1,0 +1,91 @@
+<!DOCTYPE html>
+<html lang="nl">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Ons Lijstje</title>
+<link rel="icon" href="data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 100 100%22><text y=%22.9em%22 font-size=%2290%22>🛒</text></svg>">
+<link rel="stylesheet" href="style.css">
+</head>
+<body>
+
+<header class="app-header">
+  <h1>🛒 Ons Lijstje</h1>
+  <div class="role-switch">
+    <button data-role="maker">Maak lijst</button>
+    <button data-role="shopper">Winkelen</button>
+  </div>
+</header>
+
+<main>
+  <div id="config-banner" class="banner" hidden>
+    ⚠️ Firebase is nog niet ingesteld — de app werkt nu alleen lokaal op dit toestel
+    (niet gesynchroniseerd tussen jullie telefoons). Zie <strong>README.md</strong> om dit in te stellen.
+  </div>
+
+  <!-- ============== MAKER SCHERM ============== -->
+  <section id="screen-maker">
+    <div class="card">
+      <h2>Nieuwe lijst maken</h2>
+
+      <label for="subject-select">Onderwerp</label>
+      <select id="subject-select">
+        <option value="Boodschappen">Boodschappen</option>
+        <option value="Klusjes / Meenemen">Klusjes / Meenemen</option>
+        <option value="Overig">Overig</option>
+      </select>
+
+      <div id="custom-subject-wrap" hidden>
+        <label for="custom-subject-input">Omschrijving</label>
+        <input type="text" id="custom-subject-input" placeholder="Bijv. Boerderijwinkel">
+      </div>
+
+      <div id="store-wrap">
+        <label for="store-select">Winkel</label>
+        <select id="store-select">
+          <option value="" disabled selected>Kies een winkel…</option>
+        </select>
+        <div id="store-other-wrap" hidden>
+          <label for="store-other-input">Welke winkel?</label>
+          <input type="text" id="store-other-input" placeholder="Naam winkel">
+        </div>
+      </div>
+
+      <label>Producten / taken</label>
+      <div class="item-add-row">
+        <input type="text" id="item-name-input" placeholder="Bijv. Melk">
+        <button class="btn btn-primary" id="add-item-btn" type="button">+ Toevoegen</button>
+      </div>
+      <button type="button" id="item-extra-toggle" class="btn btn-secondary" style="margin-top:8px; font-size:13px; padding:6px 10px;">🔗 Link of afbeelding toevoegen</button>
+      <div id="item-extra-wrap" class="item-add-extra" hidden style="margin-top:8px;">
+        <input type="url" id="item-link-input" placeholder="Link (optioneel)">
+        <input type="url" id="item-image-input" placeholder="Afbeelding-URL (optioneel)">
+      </div>
+
+      <ul class="item-draft-list" id="draft-list"></ul>
+      <p class="empty-state" id="draft-empty" style="padding:16px 0;">Nog geen producten toegevoegd.</p>
+
+      <button class="btn btn-primary btn-block" id="send-list-btn" disabled>📤 Lijst versturen</button>
+    </div>
+
+    <div class="card">
+      <h2>Eerder verstuurd</h2>
+      <div id="history-list"></div>
+      <p class="empty-state" id="history-empty">Nog geen lijstjes verstuurd.</p>
+    </div>
+  </section>
+
+  <!-- ============== SHOPPER SCHERM ============== -->
+  <section id="screen-shopper" hidden>
+    <div id="shopper-lists"></div>
+    <p class="empty-state" id="shopper-empty">Geen actieve lijstjes op dit moment. 🎉</p>
+  </section>
+</main>
+
+<div class="toast" id="toast"></div>
+
+<script src="https://cdn.jsdelivr.net/npm/@emailjs/browser@4/dist/email.min.js"></script>
+<script src="config.js"></script>
+<script type="module" src="app.js"></script>
+</body>
+</html>
