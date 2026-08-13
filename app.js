@@ -411,22 +411,64 @@ async function sendNotificationEmail(list, link) {
 const historyList = document.getElementById("history-list");
 const historyEmpty = document.getElementById("history-empty");
 
-backend.subscribeAllLists((lists) => {
+const expandedHistoryIds = new Set();
+let lastHistoryLists = [];
+
+function renderHistory() {
   historyList.innerHTML = "";
-  historyEmpty.hidden = lists.length > 0;
-  lists.forEach((list) => {
+  historyEmpty.hidden = lastHistoryLists.length > 0;
+  lastHistoryLists.forEach((list) => {
+    const wrap = document.createElement("div");
+
     const row = document.createElement("div");
     row.className = "history-item";
+    row.style.cursor = "pointer";
     const checkedCount = list.items.filter((i) => i.checked).length;
     const unavailableCount = list.items.filter((i) => i.unavailable).length;
+    const expanded = expandedHistoryIds.has(list.id);
     row.innerHTML = `
-      <span>${escapeHtml(list.subject)}${list.store ? " · " + escapeHtml(list.store) : ""}
-        <span class="meta">(${checkedCount}/${list.items.length}${unavailableCount ? `, ${unavailableCount} niet beschikbaar` : ""})</span>
+      <span>${expanded ? "▾" : "▸"} ${escapeHtml(list.subject)}${list.store ? " · " + escapeHtml(list.store) : ""}
+        <span class="meta">(${checkedCount}/${list.items.length}${unavailableCount ? `, <span style="color:var(--danger); font-weight:600;">${unavailableCount} niet beschikbaar</span>` : ""})</span>
       </span>
       <span class="status-pill ${list.status}">${list.status === "open" ? "Actief" : "Klaar"}</span>
     `;
-    historyList.appendChild(row);
+
+    const detail = document.createElement("div");
+    detail.style.padding = "0 0 12px 18px";
+    detail.hidden = !expanded;
+    list.items.forEach((item) => {
+      const line = document.createElement("div");
+      line.style.fontSize = "14px";
+      line.style.padding = "4px 0";
+      line.innerHTML = `${item.checked ? "✅" : "⬜"} ${escapeHtml(item.name)}`;
+      if (item.unavailable) {
+        const note = document.createElement("div");
+        note.className = "unavailable-note";
+        note.style.marginTop = "2px";
+        note.textContent = "⚠️ Niet beschikbaar" + (item.feedback ? ": " + item.feedback : "");
+        line.appendChild(note);
+      }
+      detail.appendChild(line);
+    });
+
+    row.addEventListener("click", () => {
+      if (expandedHistoryIds.has(list.id)) {
+        expandedHistoryIds.delete(list.id);
+      } else {
+        expandedHistoryIds.add(list.id);
+      }
+      renderHistory();
+    });
+
+    wrap.appendChild(row);
+    wrap.appendChild(detail);
+    historyList.appendChild(wrap);
   });
+}
+
+backend.subscribeAllLists((lists) => {
+  lastHistoryLists = lists;
+  renderHistory();
 });
 
 /* ---------------------------------------------------------
