@@ -451,6 +451,63 @@ function renderHistory() {
       detail.appendChild(line);
     });
 
+    if (list.status === "open") {
+      const addRow = document.createElement("div");
+      addRow.className = "item-add-row";
+      addRow.style.marginTop = "10px";
+
+      const input = document.createElement("input");
+      input.type = "text";
+      input.placeholder = "Nog iets toevoegen…";
+
+      const btn = document.createElement("button");
+      btn.type = "button";
+      btn.className = "btn btn-primary";
+      btn.textContent = "+ Toevoegen";
+
+      const submitAdd = async () => {
+        const name = input.value.trim();
+        if (!name) { input.focus(); return; }
+        btn.disabled = true;
+        const newItem = {
+          id: crypto.randomUUID(),
+          name,
+          link: "",
+          image: "",
+          checked: false,
+          unavailable: false,
+          feedback: ""
+        };
+        try {
+          await backend.updateItems(list.id, [...list.items, newItem]);
+          input.value = "";
+          showToast("Toegevoegd aan de lijst ✅");
+        } catch (err) {
+          console.error(err);
+          showToast("Toevoegen mislukt ⚠️");
+        } finally {
+          btn.disabled = false;
+          input.focus();
+        }
+      };
+
+      btn.addEventListener("click", submitAdd);
+      input.addEventListener("keydown", (e) => {
+        if (e.key === "Enter") { e.preventDefault(); submitAdd(); }
+      });
+      input.addEventListener("click", (e) => e.stopPropagation());
+
+      addRow.appendChild(input);
+      addRow.appendChild(btn);
+      detail.appendChild(addRow);
+    } else {
+      const lockedNote = document.createElement("p");
+      lockedNote.className = "meta";
+      lockedNote.style.marginTop = "8px";
+      lockedNote.textContent = "🔒 Deze lijst is afgerond en kan niet meer aangevuld worden.";
+      detail.appendChild(lockedNote);
+    }
+
     row.addEventListener("click", () => {
       if (expandedHistoryIds.has(list.id)) {
         expandedHistoryIds.delete(list.id);
