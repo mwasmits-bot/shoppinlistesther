@@ -1,6 +1,6 @@
 import { initializeApp } from "https://www.gstatic.com/firebasejs/10.13.0/firebase-app.js";
 import {
-  getFirestore, collection, addDoc, doc, updateDoc, onSnapshot,
+  getFirestore, collection, addDoc, doc, updateDoc, deleteDoc, onSnapshot,
   query, where, orderBy, serverTimestamp
 } from "https://www.gstatic.com/firebasejs/10.13.0/firebase-firestore.js";
 
@@ -52,6 +52,10 @@ class FirestoreBackend {
 
   async finishList(id) {
     await updateDoc(doc(this.col, id), { status: "finished", finishedAt: serverTimestamp() });
+  }
+
+  async deleteList(id) {
+    await deleteDoc(doc(this.col, id));
   }
 }
 
@@ -131,6 +135,11 @@ class LocalBackend {
     const raw = JSON.parse(localStorage.getItem(LOCAL_KEY) || "[]");
     const list = raw.find((l) => l.id === id);
     if (list) { list.status = "finished"; list.finishedAt = new Date().toISOString(); this._writeRaw(raw); }
+  }
+
+  async deleteList(id) {
+    const raw = JSON.parse(localStorage.getItem(LOCAL_KEY) || "[]");
+    this._writeRaw(raw.filter((l) => l.id !== id));
   }
 }
 
@@ -410,14 +419,47 @@ async function sendNotificationEmail(list, link) {
 /* Geschiedenis voor de maker */
 const historyList = document.getElementById("history-list");
 const historyEmpty = document.getElementById("history-empty");
+const historyTabBtns = document.querySelectorAll(".history-tab-btn");
+const clearFinishedBtn = document.getElementById("clear-finished-btn");
 
 const expandedHistoryIds = new Set();
 let lastHistoryLists = [];
+let historyTab = "open";
+
+function setHistoryTab(tab) {
+  historyTab = tab;
+  historyTabBtns.forEach((b) => b.classList.toggle("active", b.dataset.tab === tab));
+  renderHistory();
+}
+historyTabBtns.forEach((b) => b.addEventListener("click", () => setHistoryTab(b.dataset.tab)));
+setHistoryTab("open");
+
+clearFinishedBtn.addEventListener("click", async () => {
+  const finished = lastHistoryLists.filter((l) => l.status === "finished");
+  if (finished.length === 0) return;
+  if (!confirm(`${finished.length} afgeronde lijstje(s) definitief wissen?`)) return;
+  clearFinishedBtn.disabled = true;
+  try {
+    await Promise.all(finished.map((l) => backend.deleteList(l.id)));
+    showToast("Afgeronde lijstjes gewist 🗑️");
+  } catch (err) {
+    console.error(err);
+    showToast("Wissen mislukt ⚠️");
+  } finally {
+    clearFinishedBtn.disabled = false;
+  }
+});
 
 function renderHistory() {
+  const filtered = lastHistoryLists.filter((l) => l.status === historyTab);
   historyList.innerHTML = "";
-  historyEmpty.hidden = lastHistoryLists.length > 0;
-  lastHistoryLists.forEach((list) => {
+  historyEmpty.hidden = filtered.length > 0;
+  historyEmpty.textContent = historyTab === "open"
+    ? "Geen actieve lijstjes."
+    : "Geen afgeronde lijstjes.";
+  clearFinishedBtn.hidden = !(historyTab === "finished" && filtered.length > 0);
+
+  filtered.forEach((list) => {
     const wrap = document.createElement("div");
 
     const row = document.createElement("div");
@@ -430,8 +472,38 @@ function renderHistory() {
       <span>${expanded ? "▾" : "▸"} ${escapeHtml(list.subject)}${list.store ? " · " + escapeHtml(list.store) : ""}
         <span class="meta">(${checkedCount}/${list.items.length}${unavailableCount ? `, <span style="color:var(--danger); font-weight:600;">${unavailableCount} niet beschikbaar</span>` : ""})</span>
       </span>
-      <span class="status-pill ${list.status}">${list.status === "open" ? "Actief" : "Klaar"}</span>
     `;
+
+    const statusWrap = document.createElement("span");
+    statusWrap.style.display = "flex";
+    statusWrap.style.alignItems = "center";
+    statusWrap.style.gap = "6px";
+    statusWrap.style.flexShrink = "0";
+    const pill = document.createElement("span");
+    pill.className = `status-pill ${list.status}`;
+    pill.textContent = list.status === "open" ? "Actief" : "Klaar";
+    statusWrap.appendChild(pill);
+
+    if (list.status === "finished") {
+      const delBtn = document.createElement("button");
+      delBtn.className = "history-delete-btn";
+      delBtn.type = "button";
+      delBtn.title = "Lijst verwijderen";
+      delBtn.textContent = "🗑️";
+      delBtn.addEventListener("click", async (e) => {
+        e.stopPropagation();
+        if (!confirm(`"${list.subject}${list.store ? " · " + list.store : ""}" definitief verwijderen?`)) return;
+        try {
+          await backend.deleteList(list.id);
+        } catch (err) {
+          console.error(err);
+          showToast("Verwijderen mislukt ⚠️");
+        }
+      });
+      statusWrap.appendChild(delBtn);
+    }
+
+    row.appendChild(statusWrap);
 
     const detail = document.createElement("div");
     detail.style.padding = "0 0 12px 18px";

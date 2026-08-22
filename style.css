@@ -13,6 +13,7 @@
 }
 
 * { box-sizing: border-box; }
+[hidden] { display: none !important; }
 
 body {
   margin: 0;
@@ -357,3 +358,40 @@ ul.item-draft-list li:last-child { border-bottom: none; }
 }
 .status-pill.open { background: #e6f5ee; color: var(--primary-dark); }
 .status-pill.finished { background: #eef1ef; color: var(--muted); }
+
+.tab-switch {
+  display: flex;
+  gap: 6px;
+  background: #eef2f0;
+  border-radius: 999px;
+  padding: 3px;
+  margin-bottom: 14px;
+  width: fit-content;
+}
+
+.tab-switch button {
+  border: none;
+  background: transparent;
+  color: var(--muted);
+  padding: 7px 16px;
+  border-radius: 999px;
+  font-size: 13px;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.tab-switch button.active {
+  background: white;
+  color: var(--primary-dark);
+  box-shadow: 0 1px 2px rgba(0,0,0,0.08);
+}
+
+.history-delete-btn {
+  border: none;
+  background: none;
+  color: var(--danger);
+  font-size: 15px;
+  cursor: pointer;
+  padding: 4px 6px;
+  flex-shrink: 0;
+}

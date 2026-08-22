@@ -5,7 +5,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <title>Ons Lijstje</title>
 <link rel="icon" href="data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 100 100%22><text y=%22.9em%22 font-size=%2290%22>🛒</text></svg>">
-<link rel="stylesheet" href="style.css">
+<link rel="stylesheet" href="style.css?v=7">
 </head>
 <body>
 
@@ -72,6 +72,11 @@
 
     <div class="card">
       <h2>Eerder verstuurd</h2>
+      <div class="tab-switch">
+        <button type="button" class="history-tab-btn" data-tab="open">Actief</button>
+        <button type="button" class="history-tab-btn" data-tab="finished">Klaar</button>
+      </div>
+      <button type="button" id="clear-finished-btn" class="btn btn-danger" style="margin-bottom:14px;" hidden>🗑️ Wis alle afgeronde lijstjes</button>
       <div id="history-list"></div>
       <p class="empty-state" id="history-empty">Nog geen lijstjes verstuurd.</p>
     </div>
@@ -87,7 +92,7 @@
 <div class="toast" id="toast"></div>
 
 <script src="https://cdn.jsdelivr.net/npm/@emailjs/browser@4/dist/email.min.js"></script>
-<script src="config.js?v=5"></script>
-<script type="module" src="app.js?v=5"></script>
+<script src="config.js?v=6"></script>
+<script type="module" src="app.js?v=6"></script>
 </body>
 </html>
