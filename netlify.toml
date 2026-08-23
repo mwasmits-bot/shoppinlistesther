@@ -1,5 +1,12 @@
 [build]
   functions = "netlify/functions"
 
+  # Firebase's client-side Web API key is meant to be public (it just
+  # identifies the project — access is controlled by Firestore rules, not
+  # this key), but Netlify's secrets scanner flags it as a likely secret
+  # by pattern. Exempt this known value instead of disabling the scanner.
+  [build.environment]
+    SECRETS_SCAN_SMART_DETECTION_OMIT_VALUES = "AIzaSyBvODvwtZQqQ55HZDnr3ly45c8dz8oz7lo"
+
 [functions]
   node_bundler = "esbuild"
