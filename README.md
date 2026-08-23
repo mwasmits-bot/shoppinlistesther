@@ -99,33 +99,32 @@ Hiermee krijg jij een melding op je telefoon zodra Esther een lijstje maakt of a
 de app niet openstaat. Op de iPhone werkt dit **alleen** als de app is toegevoegd aan het
 beginscherm (Deel-knop → "Zet op beginscherm") en je 'm vanaf daar opent, sinds iOS 16.4.
 
-1. **VAPID-sleutels genereren** (eenmalig, op je eigen computer met Node.js geïnstalleerd):
-   ```
-   npx web-push generate-vapid-keys
-   ```
-   Dit geeft een `Public Key` en `Private Key`.
-2. Vul in [`config.js`](config.js) bij `push.vapidPublicKey` de **Public Key** in.
-3. **Firebase service-account aanmaken** (zodat de server-function bij de lijst-database mag):
+VAPID-sleutels zijn al gegenereerd — de **Public Key** staat al in [`config.js`](config.js). De
+bijbehorende **Private Key** krijg je los (in de chat, niet in de repo): die vul je hieronder in
+bij stap 2.
+
+1. **Firebase service-account aanmaken** (zodat de server-function bij de lijst-database mag):
    - Ga in [console.firebase.google.com](https://console.firebase.google.com) naar je project →
      tandwiel-icoon → **Projectinstellingen → Service accounts**.
    - Klik **"Nieuwe privésleutel genereren"** — dit downloadt een JSON-bestand. **Deel dit nooit
      en zet het niet in de repo.**
-4. **Firestore-regels uitbreiden** zodat toestellen zich kunnen aan/afmelden voor meldingen. Voeg
-   dit toe aan **Firestore Database → Regels**, naast de `lists`-regel uit stap 1:
+2. **Firestore-regels uitbreiden** zodat toestellen zich kunnen aan/afmelden voor meldingen. Voeg
+   dit toe aan **Firestore Database → Regels**, naast de `lists`-regel uit stap 1 van sectie 1
+   hierboven:
    ```
    match /pushSubscriptions/{subId} {
      allow read, write: if true;
    }
    ```
-5. **Omgevingsvariabelen instellen in Netlify**: ga naar je site → **Site configuration →
+3. **Omgevingsvariabelen instellen in Netlify**: ga naar je site → **Site configuration →
    Environment variables** en voeg toe:
-   - `VAPID_PUBLIC_KEY` — de Public Key van stap 1
-   - `VAPID_PRIVATE_KEY` — de Private Key van stap 1
+   - `VAPID_PUBLIC_KEY` — zelfde waarde als `push.vapidPublicKey` in `config.js`
+   - `VAPID_PRIVATE_KEY` — de Private Key die je los van Claude hebt gekregen
    - `VAPID_CONTACT_EMAIL` — jullie e-mailadres (bijv. `mwa.smits@gmail.com`)
-   - `FIREBASE_SERVICE_ACCOUNT` — de **volledige inhoud** van het JSON-bestand uit stap 3, geplakt
+   - `FIREBASE_SERVICE_ACCOUNT` — de **volledige inhoud** van het JSON-bestand uit stap 1, geplakt
      als tekst
-6. Push (of laat opnieuw deployen) zodat `config.js` en de Netlify-instellingen actief worden.
-7. Open de app **vanaf het beginscherm-icoon** op de telefoon(s) die een melding moeten krijgen,
+4. Zorg dat de site opnieuw deployt (gebeurt automatisch als de repo aan Netlify gekoppeld is).
+5. Open de app **vanaf het beginscherm-icoon** op de telefoon(s) die een melding moeten krijgen,
    en tik op het 🔕-belletje rechtsboven. Zet permissies aan wanneer iOS erom vraagt — het
    belletje wordt dan 🔔.
 

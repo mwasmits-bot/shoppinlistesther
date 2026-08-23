@@ -21,9 +21,9 @@ window.APP_CONFIG = {
     toEmail: "mwa.smits@gmail.com"
   },
   push: {
-    // VAPID public key — genereer met `npx web-push generate-vapid-keys`.
-    // Zolang dit leeg is, blijft de meldingsknop verborgen. Zie README.md.
-    vapidPublicKey: "",
+    // VAPID public key (de bijbehorende private key hoort NIET hier, maar
+    // alleen als Netlify-omgevingsvariabele VAPID_PRIVATE_KEY — zie README.md).
+    vapidPublicKey: "BB4MqHjMW7uSiaL1vXOyAw8LP--FzfMjA9sWOyILD01tm8RJA5-OKcbDb-QNztvP0IIN90-YNNxsqiyhif_3c8E",
     // Endpoint van de Netlify-function die de push daadwerkelijk verstuurt.
     notifyUrl: "/.netlify/functions/send-push"
   }
