@@ -288,7 +288,7 @@ updatePushButton();
 async function notifyListChange({ title, body, listId }) {
   if (!CFG.push?.notifyUrl || !CFG.push?.vapidPublicKey) return;
   try {
-    await fetch(CFG.push.notifyUrl, {
+    const res = await fetch(CFG.push.notifyUrl, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
@@ -297,8 +297,16 @@ async function notifyListChange({ title, body, listId }) {
         url: `${location.pathname}?role=shopper${listId ? "&list=" + listId : ""}`
       })
     });
+    const data = await res.json().catch(() => ({}));
+    if (!res.ok || data.reason) {
+      console.error("Push notify failed:", res.status, data);
+      showToast(`Melding versturen mislukt: ${data.message || data.reason || res.status} ⚠️`, 8000);
+    } else if (data.sent === 0) {
+      showToast("Lijst verstuurd, maar niemand heeft meldingen aan staan 🔕", 6000);
+    }
   } catch (err) {
     console.error("Push notify error:", err);
+    showToast(`Melding versturen mislukt: ${err.message} ⚠️`, 8000);
   }
 }
 
