@@ -254,7 +254,8 @@ async function enablePush() {
     showToast("Meldingen aangezet 🔔");
   } catch (err) {
     console.error("Push subscribe error:", err);
-    showToast("Meldingen aanzetten mislukt — voeg de app eerst toe aan je beginscherm ⚠️");
+    const detail = [err?.name, err?.message].filter(Boolean).join(": ") || String(err);
+    showToast(`Meldingen aanzetten mislukt ⚠️ (${detail})`, 8000);
   }
   updatePushButton();
 }
@@ -906,10 +907,10 @@ function escapeHtml(str) {
 }
 
 let toastTimer;
-function showToast(msg) {
+function showToast(msg, duration = 3000) {
   const el = document.getElementById("toast");
   el.textContent = msg;
   el.classList.add("show");
   clearTimeout(toastTimer);
-  toastTimer = setTimeout(() => el.classList.remove("show"), 3000);
+  toastTimer = setTimeout(() => el.classList.remove("show"), duration);
 }
