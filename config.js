@@ -19,5 +19,12 @@ window.APP_CONFIG = {
     templateId: "template_vgbp1u4",
     // E-mailadres dat een bericht krijgt zodra er een nieuwe lijst is
     toEmail: "mwa.smits@gmail.com"
+  },
+  push: {
+    // VAPID public key (de bijbehorende private key hoort NIET hier, maar
+    // alleen als Netlify-omgevingsvariabele VAPID_PRIVATE_KEY — zie README.md).
+    vapidPublicKey: "BB4MqHjMW7uSiaL1vXOyAw8LP--FzfMjA9sWOyILD01tm8RJA5-OKcbDb-QNztvP0IIN90-YNNxsqiyhif_3c8E",
+    // Endpoint van de Netlify-function die de push daadwerkelijk verstuurt.
+    notifyUrl: "/.netlify/functions/send-push"
   }
 };
