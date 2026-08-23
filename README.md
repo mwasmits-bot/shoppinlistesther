@@ -76,15 +76,62 @@ moet je twee gratis accounts instellen. Dat kost eenmalig ongeveer 15 minuten.
 
 ## 3. Live zetten op Netlify
 
-1. Ga naar [app.netlify.com](https://app.netlify.com) en log in op je bestaande account.
-2. Klik **"Add new site" → "Deploy manually"**.
-3. Sleep de hele map `boodschappenlijst-app` (met `index.html`, `style.css`, `app.js`, `config.js`)
-   in het upload-vak.
-4. Klaar — je krijgt een URL zoals `https://ons-lijstje.netlify.app`. Open die op beide telefoons
-   en zet er een snelkoppeling van op het beginscherm.
+Push-meldingen (stap 4 hieronder) hebben een **serverless function** nodig die meedeployt. Dat
+werkt alleen betrouwbaar als de site gekoppeld is aan de GitHub-repo (niet met de oude
+"sleep een map in het upload-vak"-methode, want dan worden de function-dependencies niet
+geïnstalleerd). Gebruik daarom:
 
-   *Tip:* als je later `config.js` aanpast, upload je gewoon opnieuw dezelfde map (of koppel de map
-   later aan een GitHub-repo voor automatische deploys via "Add new site" → "Import from Git").
+1. Ga naar [app.netlify.com](https://app.netlify.com) en log in op je bestaande account.
+2. Klik **"Add new site" → "Import an existing project"** en koppel deze GitHub-repo.
+3. Laat de build-instellingen leeg (geen build command nodig) — `netlify.toml` regelt de rest.
+4. Klaar — je krijgt een URL zoals `https://ons-lijstje.netlify.app`. Elke push naar de hoofdbranch
+   deployt automatisch opnieuw. Open de URL op beide telefoons en zet er een snelkoppeling van op
+   het beginscherm.
+
+   *Wil je liever geen push-meldingen instellen?* Dan kan de oude manier (map slepen in het
+   upload-vak) nog steeds, maar dan blijft stap 4 hieronder niet werken.
+
+---
+
+## 4. Push-meldingen instellen (optioneel)
+
+Hiermee krijg jij een melding op je telefoon zodra Esther een lijstje maakt of aanvult — ook als
+de app niet openstaat. Op de iPhone werkt dit **alleen** als de app is toegevoegd aan het
+beginscherm (Deel-knop → "Zet op beginscherm") en je 'm vanaf daar opent, sinds iOS 16.4.
+
+1. **VAPID-sleutels genereren** (eenmalig, op je eigen computer met Node.js geïnstalleerd):
+   ```
+   npx web-push generate-vapid-keys
+   ```
+   Dit geeft een `Public Key` en `Private Key`.
+2. Vul in [`config.js`](config.js) bij `push.vapidPublicKey` de **Public Key** in.
+3. **Firebase service-account aanmaken** (zodat de server-function bij de lijst-database mag):
+   - Ga in [console.firebase.google.com](https://console.firebase.google.com) naar je project →
+     tandwiel-icoon → **Projectinstellingen → Service accounts**.
+   - Klik **"Nieuwe privésleutel genereren"** — dit downloadt een JSON-bestand. **Deel dit nooit
+     en zet het niet in de repo.**
+4. **Firestore-regels uitbreiden** zodat toestellen zich kunnen aan/afmelden voor meldingen. Voeg
+   dit toe aan **Firestore Database → Regels**, naast de `lists`-regel uit stap 1:
+   ```
+   match /pushSubscriptions/{subId} {
+     allow read, write: if true;
+   }
+   ```
+5. **Omgevingsvariabelen instellen in Netlify**: ga naar je site → **Site configuration →
+   Environment variables** en voeg toe:
+   - `VAPID_PUBLIC_KEY` — de Public Key van stap 1
+   - `VAPID_PRIVATE_KEY` — de Private Key van stap 1
+   - `VAPID_CONTACT_EMAIL` — jullie e-mailadres (bijv. `mwa.smits@gmail.com`)
+   - `FIREBASE_SERVICE_ACCOUNT` — de **volledige inhoud** van het JSON-bestand uit stap 3, geplakt
+     als tekst
+6. Push (of laat opnieuw deployen) zodat `config.js` en de Netlify-instellingen actief worden.
+7. Open de app **vanaf het beginscherm-icoon** op de telefoon(s) die een melding moeten krijgen,
+   en tik op het 🔕-belletje rechtsboven. Zet permissies aan wanneer iOS erom vraagt — het
+   belletje wordt dan 🔔.
+
+Zodra dit staat, krijgt elk toestel dat op het belletje heeft getikt een melding bij een nieuw of
+aangevuld lijstje. Zonder deze stappen blijft de app gewoon werken zoals voorheen — het belletje
+blijft dan verborgen.
 
 ---
 
@@ -98,6 +145,8 @@ moet je twee gratis accounts instellen. Dat kost eenmalig ongeveer 15 minuten.
 - De app onthoudt op elk toestel welke rol je laatst gebruikte. Je kunt altijd wisselen via de
   knoppen rechtsboven.
 - De mail-link opent de app automatisch in het "Winkelen"-scherm, gericht op dat specifieke lijstje.
+- Als push-meldingen zijn ingesteld (zie stap 4), staat er een belletje 🔕/🔔 rechtsboven waarmee
+  je meldingen per toestel aan- of uitzet.
 
 ## Zonder Firebase/EmailJS testen
 

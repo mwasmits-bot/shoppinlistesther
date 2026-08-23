@@ -1,6 +1,6 @@
 import { initializeApp } from "https://www.gstatic.com/firebasejs/10.13.0/firebase-app.js";
 import {
-  getFirestore, collection, addDoc, doc, updateDoc, deleteDoc, onSnapshot,
+  getFirestore, collection, addDoc, doc, setDoc, updateDoc, deleteDoc, onSnapshot,
   query, where, orderBy, serverTimestamp
 } from "https://www.gstatic.com/firebasejs/10.13.0/firebase-firestore.js";
 
@@ -56,6 +56,17 @@ class FirestoreBackend {
 
   async deleteList(id) {
     await deleteDoc(doc(this.col, id));
+  }
+
+  async savePushSubscription(id, subscription) {
+    await setDoc(doc(this.db, "pushSubscriptions", id), {
+      ...subscription,
+      updatedAt: serverTimestamp()
+    });
+  }
+
+  async deletePushSubscription(id) {
+    await deleteDoc(doc(this.db, "pushSubscriptions", id));
   }
 }
 
@@ -141,6 +152,12 @@ class LocalBackend {
     const raw = JSON.parse(localStorage.getItem(LOCAL_KEY) || "[]");
     this._writeRaw(raw.filter((l) => l.id !== id));
   }
+
+  async savePushSubscription() {
+    /* Push-meldingen vereisen Firestore + de send-push function, zie README. */
+  }
+
+  async deletePushSubscription() {}
 }
 
 const usingFirestore = Boolean(CFG.firebase.apiKey);
@@ -185,6 +202,104 @@ document.querySelectorAll(".role-switch button").forEach((b) => {
 });
 
 setRole(currentRole);
+
+/* ---------------------------------------------------------
+   PUSH-MELDINGEN
+   Meldingen op de telefoon wanneer er een lijst wordt gemaakt
+   of aangevuld. Werkt alleen als de app is toegevoegd aan het
+   beginscherm (vereist op iPhone) en Firestore + de send-push
+   Netlify-function zijn ingesteld (zie README.md).
+--------------------------------------------------------- */
+
+const PUSH_SUB_KEY = "boodschappenlijst_push_subscribed";
+const pushToggleBtn = document.getElementById("push-toggle-btn");
+const pushSupported = "serviceWorker" in navigator && "PushManager" in window && Boolean(CFG.push?.vapidPublicKey) && usingFirestore;
+
+function urlBase64ToUint8Array(base64String) {
+  const padding = "=".repeat((4 - (base64String.length % 4)) % 4);
+  const base64 = (base64String + padding).replace(/-/g, "+").replace(/_/g, "/");
+  const raw = atob(base64);
+  return Uint8Array.from([...raw].map((c) => c.charCodeAt(0)));
+}
+
+async function subIdFor(endpoint) {
+  const hash = await crypto.subtle.digest("SHA-256", new TextEncoder().encode(endpoint));
+  return [...new Uint8Array(hash)].map((b) => b.toString(16).padStart(2, "0")).join("");
+}
+
+function updatePushButton() {
+  if (!pushToggleBtn) return;
+  pushToggleBtn.hidden = !pushSupported;
+  if (!pushSupported) return;
+  const on = Notification.permission === "granted" && localStorage.getItem(PUSH_SUB_KEY) === "1";
+  pushToggleBtn.textContent = on ? "🔔" : "🔕";
+  pushToggleBtn.title = on ? "Meldingen staan aan (tik om uit te zetten)" : "Meldingen aanzetten";
+}
+
+async function enablePush() {
+  try {
+    const reg = await navigator.serviceWorker.register("sw.js");
+    const permission = await Notification.requestPermission();
+    if (permission !== "granted") {
+      showToast("Meldingen niet toegestaan");
+      return;
+    }
+    const sub = await reg.pushManager.subscribe({
+      userVisibleOnly: true,
+      applicationServerKey: urlBase64ToUint8Array(CFG.push.vapidPublicKey)
+    });
+    const id = await subIdFor(sub.endpoint);
+    await backend.savePushSubscription(id, sub.toJSON());
+    localStorage.setItem(PUSH_SUB_KEY, "1");
+    showToast("Meldingen aangezet 🔔");
+  } catch (err) {
+    console.error("Push subscribe error:", err);
+    showToast("Meldingen aanzetten mislukt — voeg de app eerst toe aan je beginscherm ⚠️");
+  }
+  updatePushButton();
+}
+
+async function disablePush() {
+  try {
+    const reg = await navigator.serviceWorker.getRegistration();
+    const sub = await reg?.pushManager.getSubscription();
+    if (sub) {
+      const id = await subIdFor(sub.endpoint);
+      await sub.unsubscribe();
+      await backend.deletePushSubscription(id);
+    }
+  } catch (err) {
+    console.error("Push unsubscribe error:", err);
+  }
+  localStorage.removeItem(PUSH_SUB_KEY);
+  showToast("Meldingen uitgezet");
+  updatePushButton();
+}
+
+if (pushToggleBtn) {
+  pushToggleBtn.addEventListener("click", () => {
+    const on = Notification.permission === "granted" && localStorage.getItem(PUSH_SUB_KEY) === "1";
+    if (on) disablePush(); else enablePush();
+  });
+}
+updatePushButton();
+
+async function notifyListChange({ title, body, listId }) {
+  if (!CFG.push?.notifyUrl || !CFG.push?.vapidPublicKey) return;
+  try {
+    await fetch(CFG.push.notifyUrl, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        title,
+        body,
+        url: `${location.pathname}?role=shopper${listId ? "&list=" + listId : ""}`
+      })
+    });
+  } catch (err) {
+    console.error("Push notify error:", err);
+  }
+}
 
 /* ---------------------------------------------------------
    MAKER SCHERM
@@ -367,6 +482,11 @@ sendListBtn.addEventListener("click", async () => {
     const id = await backend.createList({ subject, store, items: draftItems });
     const link = `${location.origin}${location.pathname}?role=shopper&list=${id}`;
     const emailResult = await sendNotificationEmail({ subject, store, items: draftItems }, link);
+    notifyListChange({
+      title: `Nieuw lijstje: ${subject}`,
+      body: `${store ? store + " · " : ""}${draftItems.length} ding(en)`,
+      listId: id
+    });
 
     draftItems = [];
     renderDraftList();
@@ -554,6 +674,11 @@ function renderHistory() {
           await backend.updateItems(list.id, [...list.items, newItem]);
           input.value = "";
           showToast("Toegevoegd aan de lijst ✅");
+          notifyListChange({
+            title: `Lijst aangevuld: ${list.subject}`,
+            body: `+ ${name}`,
+            listId: list.id
+          });
         } catch (err) {
           console.error(err);
           showToast("Toevoegen mislukt ⚠️");

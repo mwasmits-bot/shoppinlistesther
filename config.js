@@ -19,5 +19,12 @@ window.APP_CONFIG = {
     templateId: "template_vgbp1u4",
     // E-mailadres dat een bericht krijgt zodra er een nieuwe lijst is
     toEmail: "mwa.smits@gmail.com"
+  },
+  push: {
+    // VAPID public key — genereer met `npx web-push generate-vapid-keys`.
+    // Zolang dit leeg is, blijft de meldingsknop verborgen. Zie README.md.
+    vapidPublicKey: "",
+    // Endpoint van de Netlify-function die de push daadwerkelijk verstuurt.
+    notifyUrl: "/.netlify/functions/send-push"
   }
 };
