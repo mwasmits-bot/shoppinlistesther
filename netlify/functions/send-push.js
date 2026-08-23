@@ -30,33 +30,40 @@ exports.handler = async (event) => {
     return { statusCode: 400, body: "Missing title" };
   }
 
-  webpush.setVapidDetails(
-    `mailto:${process.env.VAPID_CONTACT_EMAIL || "no-reply@example.com"}`,
-    process.env.VAPID_PUBLIC_KEY,
-    process.env.VAPID_PRIVATE_KEY
-  );
+  try {
+    webpush.setVapidDetails(
+      `mailto:${process.env.VAPID_CONTACT_EMAIL || "no-reply@example.com"}`,
+      process.env.VAPID_PUBLIC_KEY,
+      process.env.VAPID_PRIVATE_KEY
+    );
 
-  const db = getDb();
-  const snap = await db.collection("pushSubscriptions").get();
-  const notifPayload = JSON.stringify({ title, body: body || "", url: url || "./" });
+    const db = getDb();
+    const snap = await db.collection("pushSubscriptions").get();
+    const notifPayload = JSON.stringify({ title, body: body || "", url: url || "./" });
 
-  let sent = 0;
-  await Promise.all(snap.docs.map(async (docSnap) => {
-    const sub = docSnap.data();
-    try {
-      await webpush.sendNotification(
-        { endpoint: sub.endpoint, keys: sub.keys },
-        notifPayload
-      );
-      sent += 1;
-    } catch (err) {
-      if (err.statusCode === 404 || err.statusCode === 410) {
-        await docSnap.ref.delete();
-      } else {
-        console.error("Push send error:", err);
+    let sent = 0;
+    const errors = [];
+    await Promise.all(snap.docs.map(async (docSnap) => {
+      const sub = docSnap.data();
+      try {
+        await webpush.sendNotification(
+          { endpoint: sub.endpoint, keys: sub.keys },
+          notifPayload
+        );
+        sent += 1;
+      } catch (err) {
+        if (err.statusCode === 404 || err.statusCode === 410) {
+          await docSnap.ref.delete();
+        } else {
+          console.error("Push send error:", err);
+          errors.push(`${err.statusCode || ""} ${err.message || err}`.trim());
+        }
       }
-    }
-  }));
+    }));
 
-  return { statusCode: 200, body: JSON.stringify({ sent }) };
+    return { statusCode: 200, body: JSON.stringify({ sent, total: snap.docs.length, errors }) };
+  } catch (err) {
+    console.error("send-push fatal error:", err);
+    return { statusCode: 500, body: JSON.stringify({ sent: 0, reason: "error", message: err.message || String(err) }) };
+  }
 };
