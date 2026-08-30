@@ -54,6 +54,10 @@ class FirestoreBackend {
     await updateDoc(doc(this.col, id), { status: "finished", finishedAt: serverTimestamp() });
   }
 
+  async reopenList(id) {
+    await updateDoc(doc(this.col, id), { status: "open", finishedAt: null });
+  }
+
   async deleteList(id) {
     await deleteDoc(doc(this.col, id));
   }
@@ -135,6 +139,12 @@ class LocalBackend {
     const raw = JSON.parse(localStorage.getItem(LOCAL_KEY) || "[]");
     const list = raw.find((l) => l.id === id);
     if (list) { list.status = "finished"; list.finishedAt = new Date().toISOString(); this._writeRaw(raw); }
+  }
+
+  async reopenList(id) {
+    const raw = JSON.parse(localStorage.getItem(LOCAL_KEY) || "[]");
+    const list = raw.find((l) => l.id === id);
+    if (list) { list.status = "open"; list.finishedAt = null; this._writeRaw(raw); }
   }
 
   async deleteList(id) {
@@ -485,6 +495,23 @@ function renderHistory() {
     statusWrap.appendChild(pill);
 
     if (list.status === "finished") {
+      const reopenBtn = document.createElement("button");
+      reopenBtn.className = "history-delete-btn";
+      reopenBtn.type = "button";
+      reopenBtn.title = "Lijst heropenen";
+      reopenBtn.textContent = "↩️";
+      reopenBtn.addEventListener("click", async (e) => {
+        e.stopPropagation();
+        try {
+          await backend.reopenList(list.id);
+          showToast("Lijst heropend ↩️");
+        } catch (err) {
+          console.error(err);
+          showToast("Heropenen mislukt ⚠️");
+        }
+      });
+      statusWrap.appendChild(reopenBtn);
+
       const delBtn = document.createElement("button");
       delBtn.className = "history-delete-btn";
       delBtn.type = "button";
@@ -651,9 +678,12 @@ function renderShopperCard(list) {
 
   const finishRow = document.createElement("div");
   finishRow.className = "finish-row";
+  finishRow.style.justifyContent = "flex-end";
   const finishBtn = document.createElement("button");
-  finishBtn.className = "btn btn-primary";
-  finishBtn.textContent = "✅ Lijst afronden";
+  finishBtn.className = "btn btn-secondary";
+  finishBtn.style.fontSize = "13px";
+  finishBtn.style.padding = "7px 12px";
+  finishBtn.textContent = "Lijst afronden";
   finishBtn.addEventListener("click", async () => {
     finishBtn.disabled = true;
     await backend.finishList(list.id);
