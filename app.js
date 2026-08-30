@@ -295,7 +295,7 @@ if (pushToggleBtn) {
 }
 updatePushButton();
 
-async function notifyListChange({ title, body, listId }) {
+async function notifyListChange({ title, body, listId, role = "shopper" }) {
   if (!CFG.push?.notifyUrl || !CFG.push?.vapidPublicKey) return;
   try {
     const res = await fetch(CFG.push.notifyUrl, {
@@ -304,7 +304,7 @@ async function notifyListChange({ title, body, listId }) {
       body: JSON.stringify({
         title,
         body,
-        url: `${location.pathname}?role=shopper${listId ? "&list=" + listId : ""}`
+        url: `${location.pathname}?role=${role}${listId ? "&list=" + listId : ""}`
       })
     });
     const data = await res.json().catch(() => ({}));
@@ -822,6 +822,13 @@ function renderShopperCard(list) {
     finishBtn.disabled = true;
     await backend.finishList(list.id);
     showToast("Lijst afgerond ✅");
+    const unavailableCount = list.items.filter((i) => i.unavailable).length;
+    notifyListChange({
+      title: `Lijst afgerond: ${list.subject}`,
+      body: `${checked}/${total} gepakt${unavailableCount ? `, ${unavailableCount} niet beschikbaar` : ""}`,
+      listId: list.id,
+      role: "maker"
+    });
   });
   finishRow.appendChild(finishBtn);
   card.appendChild(finishRow);
