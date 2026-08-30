@@ -1,0 +1,9 @@
+{
+  "name": "ons-lijstje",
+  "private": true,
+  "description": "Backend dependencies for de send-push Netlify function.",
+  "dependencies": {
+    "web-push": "^3.6.7",
+    "firebase-admin": "^12.1.0"
+  }
+}
