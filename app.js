@@ -5,7 +5,7 @@ import {
 } from "https://www.gstatic.com/firebasejs/10.13.0/firebase-firestore.js";
 
 const CFG = window.APP_CONFIG;
-const STORES = ["Aldi", "Albert Heijn", "Plus", "Jumbo", "Anders"];
+const STORES = ["Aldi", "Albert Heijn", "Plus", "Jumbo", "Maakt niet uit", "Anders"];
 
 /* ---------------------------------------------------------
    BACKEND — Firestore wanneer geconfigureerd, anders een
@@ -325,29 +325,45 @@ async function notifyListChange({ title, body, listId, role = "shopper" }) {
 --------------------------------------------------------- */
 
 const subjectSelect = document.getElementById("subject-select");
+const subjectButtons = document.getElementById("subject-buttons");
 const storeWrap = document.getElementById("store-wrap");
 const storeSelect = document.getElementById("store-select");
+const storeButtons = document.getElementById("store-buttons");
 const storeOtherWrap = document.getElementById("store-other-wrap");
 const storeOtherInput = document.getElementById("store-other-input");
 const customSubjectWrap = document.getElementById("custom-subject-wrap");
 const customSubjectInput = document.getElementById("custom-subject-input");
 
 STORES.forEach((s) => {
-  const opt = document.createElement("option");
-  opt.value = s;
-  opt.textContent = s;
-  storeSelect.appendChild(opt);
+  const btn = document.createElement("button");
+  btn.type = "button";
+  btn.dataset.value = s;
+  btn.textContent = s;
+  btn.addEventListener("click", () => setStore(s));
+  storeButtons.appendChild(btn);
 });
 
-subjectSelect.addEventListener("change", () => {
-  storeWrap.hidden = subjectSelect.value !== "Boodschappen";
-  customSubjectWrap.hidden = subjectSelect.value !== "Overig";
+function setSubject(value) {
+  subjectSelect.value = value;
+  subjectButtons.querySelectorAll("button").forEach((b) => {
+    b.classList.toggle("active", b.dataset.value === value);
+  });
+  storeWrap.hidden = value !== "Boodschappen";
+  customSubjectWrap.hidden = value !== "Overig";
   saveDraft();
-});
+}
 
-storeSelect.addEventListener("change", () => {
-  storeOtherWrap.hidden = storeSelect.value !== "Anders";
+function setStore(value) {
+  storeSelect.value = value;
+  storeButtons.querySelectorAll("button").forEach((b) => {
+    b.classList.toggle("active", b.dataset.value === value);
+  });
+  storeOtherWrap.hidden = value !== "Anders";
   saveDraft();
+}
+
+subjectButtons.querySelectorAll("button").forEach((b) => {
+  b.addEventListener("click", () => setSubject(b.dataset.value));
 });
 
 storeOtherInput.addEventListener("input", saveDraft);
@@ -382,15 +398,13 @@ function saveDraft() {
 function loadDraft() {
   let draft;
   try { draft = JSON.parse(localStorage.getItem(DRAFT_KEY)); } catch { /* corrupt draft, ignore */ }
-  if (!draft) return;
-  subjectSelect.value = draft.subject || "Boodschappen";
-  storeSelect.value = draft.store || "";
-  storeOtherInput.value = draft.storeOther || "";
-  customSubjectInput.value = draft.customSubject || "";
-  draftItems = Array.isArray(draft.items) ? draft.items : [];
-  storeWrap.hidden = subjectSelect.value !== "Boodschappen";
-  customSubjectWrap.hidden = subjectSelect.value !== "Overig";
-  storeOtherWrap.hidden = storeSelect.value !== "Anders";
+  if (draft) {
+    draftItems = Array.isArray(draft.items) ? draft.items : [];
+    storeOtherInput.value = draft.storeOther || "";
+    customSubjectInput.value = draft.customSubject || "";
+  }
+  setSubject((draft && draft.subject) || "Boodschappen");
+  setStore((draft && draft.store) || "");
 }
 
 function clearDraft() {
@@ -472,13 +486,10 @@ clearDraftBtn.addEventListener("click", () => {
   if (draftItems.length === 0) return;
   if (!confirm("Concept wissen? Alles wat je tot nu toe hebt toegevoegd gaat dan verloren.")) return;
   draftItems = [];
-  subjectSelect.value = "Boodschappen";
-  storeSelect.value = "";
+  setSubject("Boodschappen");
+  setStore("");
   storeOtherInput.value = "";
   customSubjectInput.value = "";
-  storeWrap.hidden = false;
-  customSubjectWrap.hidden = true;
-  storeOtherWrap.hidden = true;
   clearDraft();
   renderDraftList();
 });
@@ -486,7 +497,7 @@ clearDraftBtn.addEventListener("click", () => {
 sendListBtn.addEventListener("click", async () => {
   const subject = subjectSelect.value === "Overig" ? customSubjectInput.value.trim() : subjectSelect.value;
   if (!subject) { customSubjectInput.focus(); return; }
-  if (subjectSelect.value === "Boodschappen" && !storeSelect.value) { storeSelect.focus(); return; }
+  if (subjectSelect.value === "Boodschappen" && !storeSelect.value) { showToast("Kies eerst een winkel ⚠️"); return; }
   if (draftItems.length === 0) return;
 
   let store = null;
@@ -509,13 +520,10 @@ sendListBtn.addEventListener("click", async () => {
 
     draftItems = [];
     renderDraftList();
-    subjectSelect.value = "Boodschappen";
-    storeSelect.value = "";
+    setSubject("Boodschappen");
+    setStore("");
     storeOtherInput.value = "";
     customSubjectInput.value = "";
-    storeWrap.hidden = false;
-    customSubjectWrap.hidden = true;
-    storeOtherWrap.hidden = true;
     clearDraft();
 
     if (emailResult.sent) {

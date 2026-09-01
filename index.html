@@ -17,7 +17,7 @@
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Baloo+2:wght@500;600;700;800&display=swap">
-<link rel="stylesheet" href="style.css?v=12">
+<link rel="stylesheet" href="style.css?v=13">
 </head>
 <body>
 
@@ -43,12 +43,13 @@
     <div class="card">
       <h2>Nieuwe lijst maken</h2>
 
-      <label for="subject-select">Onderwerp</label>
-      <select id="subject-select">
-        <option value="Boodschappen">Boodschappen</option>
-        <option value="Klusjes / Meenemen">Klusjes / Meenemen</option>
-        <option value="Overig">Overig</option>
-      </select>
+      <label>Onderwerp</label>
+      <input type="hidden" id="subject-select" value="Boodschappen">
+      <div class="button-group" id="subject-buttons">
+        <button type="button" data-value="Boodschappen">🛒 Boodschappen</button>
+        <button type="button" data-value="Klusjes / Meenemen">🧰 Klusjes / Meenemen</button>
+        <button type="button" data-value="Overig">📦 Overig</button>
+      </div>
 
       <div id="custom-subject-wrap" hidden>
         <label for="custom-subject-input">Omschrijving</label>
@@ -56,10 +57,9 @@
       </div>
 
       <div id="store-wrap">
-        <label for="store-select">Winkel</label>
-        <select id="store-select">
-          <option value="" disabled selected>Kies een winkel…</option>
-        </select>
+        <label>Winkel</label>
+        <input type="hidden" id="store-select" value="">
+        <div class="button-group" id="store-buttons"></div>
         <div id="store-other-wrap" hidden>
           <label for="store-other-input">Welke winkel?</label>
           <input type="text" id="store-other-input" placeholder="Naam winkel">
@@ -108,6 +108,6 @@
 
 <script src="https://cdn.jsdelivr.net/npm/@emailjs/browser@4/dist/email.min.js"></script>
 <script src="config.js?v=7"></script>
-<script type="module" src="app.js?v=10"></script>
+<script type="module" src="app.js?v=11"></script>
 </body>
 </html>
