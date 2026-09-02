@@ -365,19 +365,6 @@ ul.item-draft-list li:last-child { border-bottom: none; }
   margin-bottom: 4px;
 }
 
-.assignee-tag {
-  display: inline-block;
-  font-size: 12px;
-  font-weight: 700;
-  font-family: var(--font-display);
-  color: #0e7490;
-  background: linear-gradient(135deg, #cffafe, #e0f2fe);
-  padding: 3px 10px;
-  border-radius: 999px;
-  margin-bottom: 4px;
-  margin-left: 6px;
-}
-
 .assignee-control {
   display: flex;
   align-items: center;
@@ -389,6 +376,12 @@ ul.item-draft-list li:last-child { border-bottom: none; }
 .button-group.compact button {
   padding: 5px 10px;
   font-size: 12px;
+}
+
+.button-group.compact.emoji-only button {
+  padding: 4px 10px;
+  font-size: 16px;
+  line-height: 1;
 }
 
 .meta {
