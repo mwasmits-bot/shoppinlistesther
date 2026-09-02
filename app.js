@@ -8,7 +8,7 @@ const CFG = window.APP_CONFIG;
 const STORES = ["Aldi", "Albert Heijn", "Plus", "Jumbo", "Maakt niet uit", "Anders"];
 /* Toewijzen gebeurt per product/taak (subtask), niet op het hele
    lijstje — met een "alles toewijzen"-snelkoppeling als bulk-optie. */
-const ASSIGNEE_EMOJI = { esther: "👩", michael: "👨‍🦳" };
+const ASSIGNEE_EMOJI = { esther: "👸", michael: "👨‍🔧" };
 const ASSIGNEE_NAMES = { esther: "Esther", michael: "Michael" };
 
 function createAssigneeToggle(currentValue, onSet) {
