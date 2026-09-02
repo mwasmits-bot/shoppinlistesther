@@ -17,7 +17,7 @@
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Baloo+2:wght@500;600;700;800&display=swap">
-<link rel="stylesheet" href="style.css?v=13">
+<link rel="stylesheet" href="style.css?v=15">
 </head>
 <body>
 
@@ -79,6 +79,7 @@
 
       <ul class="item-draft-list" id="draft-list"></ul>
       <p class="empty-state" id="draft-empty" style="padding:16px 0;">Nog geen producten toegevoegd.</p>
+      <div id="draft-bulk-assign" hidden></div>
 
       <button class="btn btn-primary btn-block" id="send-list-btn" disabled>📤 Lijst versturen</button>
       <button type="button" class="btn btn-secondary btn-block" id="clear-draft-btn" style="margin-top:8px;">🗑️ Concept wissen</button>
@@ -89,6 +90,13 @@
       <div class="tab-switch">
         <button type="button" class="history-tab-btn" data-tab="open">Actief</button>
         <button type="button" class="history-tab-btn" data-tab="finished">Klaar</button>
+      </div>
+      <label class="meta" style="margin:0 0 6px;">Filter op toegewezene</label>
+      <div class="button-group" id="assignee-filter" style="margin-bottom:14px;">
+        <button type="button" data-assignee="all">Alle</button>
+        <button type="button" data-assignee="esther" title="Esther" aria-label="Esther">👩</button>
+        <button type="button" data-assignee="michael" title="Michael" aria-label="Michael">👨‍🦳</button>
+        <button type="button" data-assignee="none">Niet toegewezen</button>
       </div>
       <button type="button" id="clear-finished-btn" class="btn btn-danger" style="margin-bottom:14px;" hidden>🗑️ Wis alle afgeronde lijstjes</button>
       <div id="history-list"></div>
@@ -107,6 +115,6 @@
 
 <script src="https://cdn.jsdelivr.net/npm/@emailjs/browser@4/dist/email.min.js"></script>
 <script src="config.js?v=7"></script>
-<script type="module" src="app.js?v=11"></script>
+<script type="module" src="app.js?v=13"></script>
 </body>
 </html>

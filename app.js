@@ -6,6 +6,43 @@ import {
 
 const CFG = window.APP_CONFIG;
 const STORES = ["Aldi", "Albert Heijn", "Plus", "Jumbo", "Maakt niet uit", "Anders"];
+/* Toewijzen gebeurt per product/taak (subtask), niet op het hele
+   lijstje — met een "alles toewijzen"-snelkoppeling als bulk-optie. */
+const ASSIGNEE_EMOJI = { esther: "👩", michael: "👨‍🦳" };
+const ASSIGNEE_NAMES = { esther: "Esther", michael: "Michael" };
+
+function createAssigneeToggle(currentValue, onSet) {
+  const group = document.createElement("div");
+  group.className = "button-group compact emoji-only";
+  Object.entries(ASSIGNEE_EMOJI).forEach(([value, emoji]) => {
+    const btn = document.createElement("button");
+    btn.type = "button";
+    btn.textContent = emoji;
+    btn.title = ASSIGNEE_NAMES[value];
+    btn.setAttribute("aria-label", ASSIGNEE_NAMES[value]);
+    btn.classList.toggle("active", currentValue === value);
+    btn.addEventListener("click", (e) => {
+      e.stopPropagation();
+      onSet(currentValue === value ? null : value);
+    });
+    group.appendChild(btn);
+  });
+  return group;
+}
+
+function createBulkAssignRow(items, onApplyAll) {
+  const wrap = document.createElement("div");
+  wrap.className = "assignee-control";
+
+  const label = document.createElement("span");
+  label.className = "meta";
+  label.textContent = "Alles toewijzen aan:";
+  wrap.appendChild(label);
+
+  wrap.appendChild(createAssigneeToggle(null, onApplyAll));
+
+  return wrap;
+}
 
 /* ---------------------------------------------------------
    BACKEND — Firestore wanneer geconfigureerd, anders een
@@ -377,6 +414,7 @@ const itemImageInput = document.getElementById("item-image-input");
 const addItemBtn = document.getElementById("add-item-btn");
 const draftList = document.getElementById("draft-list");
 const draftEmpty = document.getElementById("draft-empty");
+const draftBulkAssign = document.getElementById("draft-bulk-assign");
 const sendListBtn = document.getElementById("send-list-btn");
 
 let draftItems = [];
@@ -425,7 +463,8 @@ function addDraftItem() {
     image: itemImageInput.value.trim(),
     checked: false,
     unavailable: false,
-    feedback: ""
+    feedback: "",
+    assignee: null
   });
   itemNameInput.value = "";
   itemLinkInput.value = "";
@@ -450,6 +489,7 @@ function renderDraftList() {
     left.style.display = "flex";
     left.style.alignItems = "center";
     left.style.minWidth = "0";
+    left.style.flex = "1";
     if (item.image) {
       const img = document.createElement("img");
       img.src = item.image;
@@ -463,6 +503,17 @@ function renderDraftList() {
     label.style.textOverflow = "ellipsis";
     left.appendChild(label);
 
+    const right = document.createElement("span");
+    right.style.display = "flex";
+    right.style.alignItems = "center";
+    right.style.gap = "6px";
+    right.style.flexShrink = "0";
+    right.appendChild(createAssigneeToggle(item.assignee, (value) => {
+      item.assignee = value;
+      renderDraftList();
+      saveDraft();
+    }));
+
     const removeBtn = document.createElement("button");
     removeBtn.className = "remove-x";
     removeBtn.textContent = "✕";
@@ -471,12 +522,23 @@ function renderDraftList() {
       renderDraftList();
       saveDraft();
     });
+    right.appendChild(removeBtn);
 
     li.appendChild(left);
-    li.appendChild(removeBtn);
+    li.appendChild(right);
     draftList.appendChild(li);
   });
   sendListBtn.disabled = draftItems.length === 0;
+
+  draftBulkAssign.innerHTML = "";
+  draftBulkAssign.hidden = draftItems.length === 0;
+  if (draftItems.length > 0) {
+    draftBulkAssign.appendChild(createBulkAssignRow(draftItems, (value) => {
+      draftItems.forEach((i) => { i.assignee = value; });
+      renderDraftList();
+      saveDraft();
+    }));
+  }
 }
 loadDraft();
 renderDraftList();
@@ -568,10 +630,12 @@ const historyList = document.getElementById("history-list");
 const historyEmpty = document.getElementById("history-empty");
 const historyTabBtns = document.querySelectorAll(".history-tab-btn");
 const clearFinishedBtn = document.getElementById("clear-finished-btn");
+const assigneeFilterEl = document.getElementById("assignee-filter");
 
 const expandedHistoryIds = new Set();
 let lastHistoryLists = [];
 let historyTab = "open";
+let historyAssigneeFilter = "all";
 
 function setHistoryTab(tab) {
   historyTab = tab;
@@ -580,6 +644,14 @@ function setHistoryTab(tab) {
 }
 historyTabBtns.forEach((b) => b.addEventListener("click", () => setHistoryTab(b.dataset.tab)));
 setHistoryTab("open");
+
+function setHistoryAssigneeFilter(value) {
+  historyAssigneeFilter = value;
+  assigneeFilterEl.querySelectorAll("button").forEach((b) => b.classList.toggle("active", b.dataset.assignee === value));
+  renderHistory();
+}
+assigneeFilterEl.querySelectorAll("button").forEach((b) => b.addEventListener("click", () => setHistoryAssigneeFilter(b.dataset.assignee)));
+setHistoryAssigneeFilter("all");
 
 clearFinishedBtn.addEventListener("click", async () => {
   const finished = lastHistoryLists.filter((l) => l.status === "finished");
@@ -598,7 +670,12 @@ clearFinishedBtn.addEventListener("click", async () => {
 });
 
 function renderHistory() {
-  const filtered = lastHistoryLists.filter((l) => l.status === historyTab);
+  const filtered = lastHistoryLists.filter((l) => {
+    if (l.status !== historyTab) return false;
+    if (historyAssigneeFilter === "all") return true;
+    if (historyAssigneeFilter === "none") return l.items.some((i) => !i.assignee);
+    return l.items.some((i) => i.assignee === historyAssigneeFilter);
+  });
   historyList.innerHTML = "";
   historyEmpty.hidden = filtered.length > 0;
   historyEmpty.textContent = historyTab === "open"
@@ -676,16 +753,45 @@ function renderHistory() {
       const line = document.createElement("div");
       line.style.fontSize = "14px";
       line.style.padding = "4px 0";
-      line.innerHTML = `${item.checked ? "✅" : "⬜"} ${escapeHtml(item.name)}`;
+      line.style.display = "flex";
+      line.style.alignItems = "center";
+      line.style.flexWrap = "wrap";
+      line.style.gap = "8px";
+
+      const text = document.createElement("span");
+      text.style.flex = "1";
+      text.style.minWidth = "0";
+      text.innerHTML = `${item.checked ? "✅" : "⬜"} ${escapeHtml(item.name)}`;
+      line.appendChild(text);
+
+      line.appendChild(createAssigneeToggle(item.assignee, (value) => {
+        item.assignee = value;
+        backend.updateItems(list.id, list.items).catch((err) => {
+          console.error(err);
+          showToast("Toewijzen mislukt ⚠️");
+        });
+      }));
+
       if (item.unavailable) {
         const note = document.createElement("div");
         note.className = "unavailable-note";
         note.style.marginTop = "2px";
+        note.style.width = "100%";
         note.textContent = "⚠️ Niet beschikbaar" + (item.feedback ? ": " + item.feedback : "");
         line.appendChild(note);
       }
       detail.appendChild(line);
     });
+
+    if (list.items.length > 0) {
+      detail.appendChild(createBulkAssignRow(list.items, (value) => {
+        list.items.forEach((i) => { i.assignee = value; });
+        backend.updateItems(list.id, list.items).catch((err) => {
+          console.error(err);
+          showToast("Toewijzen mislukt ⚠️");
+        });
+      }));
+    }
 
     if (list.status === "open") {
       const addRow = document.createElement("div");
@@ -712,7 +818,8 @@ function renderHistory() {
           image: "",
           checked: false,
           unavailable: false,
-          feedback: ""
+          feedback: "",
+          assignee: null
         };
         try {
           await backend.updateItems(list.id, [...list.items, newItem]);
@@ -818,6 +925,13 @@ function renderShopperCard(list) {
   });
   card.appendChild(itemsWrap);
 
+  if (list.items.length > 0) {
+    card.appendChild(createBulkAssignRow(list.items, (value) => {
+      list.items.forEach((i) => { i.assignee = value; });
+      persistItems(list);
+    }));
+  }
+
   const finishRow = document.createElement("div");
   finishRow.className = "finish-row";
   finishRow.style.justifyContent = "flex-end";
@@ -915,6 +1029,11 @@ function renderShopItem(list, item) {
     });
     actions.appendChild(undoBtn);
   }
+
+  actions.appendChild(createAssigneeToggle(item.assignee, (value) => {
+    item.assignee = value;
+    persistItems(list);
+  }));
 
   body.appendChild(actions);
   row.appendChild(body);
