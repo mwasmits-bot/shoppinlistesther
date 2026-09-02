@@ -17,7 +17,7 @@
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Baloo+2:wght@500;600;700;800&display=swap">
-<link rel="stylesheet" href="style.css?v=13">
+<link rel="stylesheet" href="style.css?v=14">
 </head>
 <body>
 
@@ -66,6 +66,13 @@
         </div>
       </div>
 
+      <label>Toewijzen aan <span class="meta">(optioneel)</span></label>
+      <input type="hidden" id="assignee-select" value="">
+      <div class="button-group" id="assignee-buttons">
+        <button type="button" data-value="esther">👩 Esther</button>
+        <button type="button" data-value="michael">👨 Michael</button>
+      </div>
+
       <label>Producten / taken</label>
       <div class="item-add-row">
         <input type="text" id="item-name-input" placeholder="Bijv. Melk">
@@ -90,6 +97,13 @@
         <button type="button" class="history-tab-btn" data-tab="open">Actief</button>
         <button type="button" class="history-tab-btn" data-tab="finished">Klaar</button>
       </div>
+      <label class="meta" style="margin:0 0 6px;">Filter op toegewezene</label>
+      <div class="button-group" id="assignee-filter" style="margin-bottom:14px;">
+        <button type="button" data-assignee="all">Alle</button>
+        <button type="button" data-assignee="esther">👩 Esther</button>
+        <button type="button" data-assignee="michael">👨 Michael</button>
+        <button type="button" data-assignee="none">Niet toegewezen</button>
+      </div>
       <button type="button" id="clear-finished-btn" class="btn btn-danger" style="margin-bottom:14px;" hidden>🗑️ Wis alle afgeronde lijstjes</button>
       <div id="history-list"></div>
       <p class="empty-state" id="history-empty">Nog geen lijstjes verstuurd.</p>
@@ -107,6 +121,6 @@
 
 <script src="https://cdn.jsdelivr.net/npm/@emailjs/browser@4/dist/email.min.js"></script>
 <script src="config.js?v=7"></script>
-<script type="module" src="app.js?v=11"></script>
+<script type="module" src="app.js?v=12"></script>
 </body>
 </html>

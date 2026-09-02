@@ -6,6 +6,44 @@ import {
 
 const CFG = window.APP_CONFIG;
 const STORES = ["Aldi", "Albert Heijn", "Plus", "Jumbo", "Maakt niet uit", "Anders"];
+const ASSIGNEE_LABELS = { esther: "👩 Esther", michael: "👨 Michael" };
+
+function renderAssigneeTag(assignee) {
+  const label = ASSIGNEE_LABELS[assignee];
+  return label ? `<span class="assignee-tag">${label}</span>` : "";
+}
+
+function createAssigneeControl(list) {
+  const wrap = document.createElement("div");
+  wrap.className = "assignee-control";
+
+  const label = document.createElement("span");
+  label.className = "meta";
+  label.textContent = "Toegewezen aan:";
+  wrap.appendChild(label);
+
+  const group = document.createElement("div");
+  group.className = "button-group compact";
+  Object.entries(ASSIGNEE_LABELS).forEach(([value, text]) => {
+    const btn = document.createElement("button");
+    btn.type = "button";
+    btn.textContent = text;
+    btn.classList.toggle("active", list.assignee === value);
+    btn.addEventListener("click", async (e) => {
+      e.stopPropagation();
+      try {
+        await backend.updateAssignee(list.id, list.assignee === value ? null : value);
+      } catch (err) {
+        console.error(err);
+        showToast("Toewijzen mislukt ⚠️");
+      }
+    });
+    group.appendChild(btn);
+  });
+  wrap.appendChild(group);
+
+  return wrap;
+}
 
 /* ---------------------------------------------------------
    BACKEND — Firestore wanneer geconfigureerd, anders een
@@ -58,6 +96,10 @@ class FirestoreBackend {
     await updateDoc(doc(this.col, id), { status: "open", finishedAt: null });
   }
 
+  async updateAssignee(id, assignee) {
+    await updateDoc(doc(this.col, id), { assignee });
+  }
+
   async deleteList(id) {
     await deleteDoc(doc(this.col, id));
   }
@@ -79,6 +121,7 @@ function normalize(id, data) {
     id,
     subject: data.subject,
     store: data.store || null,
+    assignee: data.assignee || null,
     items: data.items || [],
     status: data.status,
     createdAt: data.createdAt?.toDate ? data.createdAt.toDate() : (data.createdAt ? new Date(data.createdAt) : null),
@@ -156,6 +199,12 @@ class LocalBackend {
     const raw = JSON.parse(localStorage.getItem(LOCAL_KEY) || "[]");
     const list = raw.find((l) => l.id === id);
     if (list) { list.status = "open"; list.finishedAt = null; this._writeRaw(raw); }
+  }
+
+  async updateAssignee(id, assignee) {
+    const raw = JSON.parse(localStorage.getItem(LOCAL_KEY) || "[]");
+    const list = raw.find((l) => l.id === id);
+    if (list) { list.assignee = assignee; this._writeRaw(raw); }
   }
 
   async deleteList(id) {
@@ -333,6 +382,8 @@ const storeOtherWrap = document.getElementById("store-other-wrap");
 const storeOtherInput = document.getElementById("store-other-input");
 const customSubjectWrap = document.getElementById("custom-subject-wrap");
 const customSubjectInput = document.getElementById("custom-subject-input");
+const assigneeSelect = document.getElementById("assignee-select");
+const assigneeButtons = document.getElementById("assignee-buttons");
 
 STORES.forEach((s) => {
   const btn = document.createElement("button");
@@ -366,6 +417,22 @@ subjectButtons.querySelectorAll("button").forEach((b) => {
   b.addEventListener("click", () => setSubject(b.dataset.value));
 });
 
+function applyAssignee(value) {
+  assigneeSelect.value = value || "";
+  assigneeButtons.querySelectorAll("button").forEach((b) => {
+    b.classList.toggle("active", b.dataset.value === value);
+  });
+}
+
+function setAssignee(value) {
+  applyAssignee(assigneeSelect.value === value ? "" : value);
+  saveDraft();
+}
+
+assigneeButtons.querySelectorAll("button").forEach((b) => {
+  b.addEventListener("click", () => setAssignee(b.dataset.value));
+});
+
 storeOtherInput.addEventListener("input", saveDraft);
 customSubjectInput.addEventListener("input", saveDraft);
 
@@ -391,6 +458,7 @@ function saveDraft() {
     store: storeSelect.value,
     storeOther: storeOtherInput.value,
     customSubject: customSubjectInput.value,
+    assignee: assigneeSelect.value,
     items: draftItems
   }));
 }
@@ -405,6 +473,7 @@ function loadDraft() {
   }
   setSubject((draft && draft.subject) || "Boodschappen");
   setStore((draft && draft.store) || "");
+  applyAssignee((draft && draft.assignee) || "");
 }
 
 function clearDraft() {
@@ -490,6 +559,7 @@ clearDraftBtn.addEventListener("click", () => {
   setStore("");
   storeOtherInput.value = "";
   customSubjectInput.value = "";
+  applyAssignee("");
   clearDraft();
   renderDraftList();
 });
@@ -504,17 +574,18 @@ sendListBtn.addEventListener("click", async () => {
   if (subjectSelect.value === "Boodschappen") {
     store = storeSelect.value === "Anders" ? storeOtherInput.value.trim() : storeSelect.value;
   }
+  const assignee = assigneeSelect.value || null;
 
   sendListBtn.disabled = true;
   sendListBtn.textContent = "Versturen…";
 
   try {
-    const id = await backend.createList({ subject, store, items: draftItems });
+    const id = await backend.createList({ subject, store, assignee, items: draftItems });
     const link = `${location.origin}${location.pathname}?role=shopper&list=${id}`;
     const emailResult = await sendNotificationEmail({ subject, store, items: draftItems }, link);
     notifyListChange({
       title: `Nieuw lijstje: ${subject}`,
-      body: `${store ? store + " · " : ""}${draftItems.length} ding(en)`,
+      body: `${store ? store + " · " : ""}${draftItems.length} ding(en)${assignee ? " · " + ASSIGNEE_LABELS[assignee] : ""}`,
       listId: id
     });
 
@@ -524,6 +595,7 @@ sendListBtn.addEventListener("click", async () => {
     setStore("");
     storeOtherInput.value = "";
     customSubjectInput.value = "";
+    applyAssignee("");
     clearDraft();
 
     if (emailResult.sent) {
@@ -568,10 +640,12 @@ const historyList = document.getElementById("history-list");
 const historyEmpty = document.getElementById("history-empty");
 const historyTabBtns = document.querySelectorAll(".history-tab-btn");
 const clearFinishedBtn = document.getElementById("clear-finished-btn");
+const assigneeFilterEl = document.getElementById("assignee-filter");
 
 const expandedHistoryIds = new Set();
 let lastHistoryLists = [];
 let historyTab = "open";
+let historyAssigneeFilter = "all";
 
 function setHistoryTab(tab) {
   historyTab = tab;
@@ -580,6 +654,14 @@ function setHistoryTab(tab) {
 }
 historyTabBtns.forEach((b) => b.addEventListener("click", () => setHistoryTab(b.dataset.tab)));
 setHistoryTab("open");
+
+function setHistoryAssigneeFilter(value) {
+  historyAssigneeFilter = value;
+  assigneeFilterEl.querySelectorAll("button").forEach((b) => b.classList.toggle("active", b.dataset.assignee === value));
+  renderHistory();
+}
+assigneeFilterEl.querySelectorAll("button").forEach((b) => b.addEventListener("click", () => setHistoryAssigneeFilter(b.dataset.assignee)));
+setHistoryAssigneeFilter("all");
 
 clearFinishedBtn.addEventListener("click", async () => {
   const finished = lastHistoryLists.filter((l) => l.status === "finished");
@@ -598,7 +680,12 @@ clearFinishedBtn.addEventListener("click", async () => {
 });
 
 function renderHistory() {
-  const filtered = lastHistoryLists.filter((l) => l.status === historyTab);
+  const filtered = lastHistoryLists.filter((l) => {
+    if (l.status !== historyTab) return false;
+    if (historyAssigneeFilter === "all") return true;
+    if (historyAssigneeFilter === "none") return !l.assignee;
+    return l.assignee === historyAssigneeFilter;
+  });
   historyList.innerHTML = "";
   historyEmpty.hidden = filtered.length > 0;
   historyEmpty.textContent = historyTab === "open"
@@ -616,7 +703,7 @@ function renderHistory() {
     const unavailableCount = list.items.filter((i) => i.unavailable).length;
     const expanded = expandedHistoryIds.has(list.id);
     row.innerHTML = `
-      <span>${expanded ? "▾" : "▸"} ${escapeHtml(list.subject)}${list.store ? " · " + escapeHtml(list.store) : ""}
+      <span>${expanded ? "▾" : "▸"} ${escapeHtml(list.subject)}${list.store ? " · " + escapeHtml(list.store) : ""}${renderAssigneeTag(list.assignee)}
         <span class="meta">(${checkedCount}/${list.items.length}${unavailableCount ? `, <span style="color:var(--danger); font-weight:600;">${unavailableCount} niet beschikbaar</span>` : ""})</span>
       </span>
     `;
@@ -686,6 +773,8 @@ function renderHistory() {
       }
       detail.appendChild(line);
     });
+
+    detail.appendChild(createAssigneeControl(list));
 
     if (list.status === "open") {
       const addRow = document.createElement("div");
@@ -803,7 +892,7 @@ function renderShopperCard(list) {
   header.innerHTML = `
     <div class="list-card-header">
       <div>
-        <span class="subject-tag">${escapeHtml(list.subject)}${list.store ? " · " + escapeHtml(list.store) : ""}</span>
+        <span class="subject-tag">${escapeHtml(list.subject)}${list.store ? " · " + escapeHtml(list.store) : ""}</span>${renderAssigneeTag(list.assignee)}
       </div>
       <span class="meta">${list.createdAt ? formatDate(list.createdAt) : ""}</span>
     </div>
@@ -817,6 +906,8 @@ function renderShopperCard(list) {
     itemsWrap.appendChild(renderShopItem(list, item));
   });
   card.appendChild(itemsWrap);
+
+  card.appendChild(createAssigneeControl(list));
 
   const finishRow = document.createElement("div");
   finishRow.className = "finish-row";
