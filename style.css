@@ -710,36 +710,30 @@ ul.item-draft-list li:last-child { border-bottom: none; }
 }
 
 /* ---------------------------------------------------------
-   TAALSCHAKELAAR — altijd zichtbaar, ongeacht welk scherm actief is
+   WINKEL-RIJ (instellingen) — zelfde opmaak als een ledenrij,
+   maar zonder emoji-knop
 --------------------------------------------------------- */
 
-.lang-switch {
-  position: fixed;
-  bottom: 16px;
-  right: 16px;
-  z-index: 200;
+.store-row {
   display: flex;
-  gap: 4px;
-  background: rgba(36, 31, 51, 0.85);
-  backdrop-filter: blur(6px);
-  border-radius: 999px;
-  padding: 4px;
-  box-shadow: 0 4px 14px rgba(0,0,0,0.2);
+  align-items: center;
+  gap: 8px;
+  margin-top: 10px;
 }
 
-.lang-switch button {
-  border: none;
-  background: transparent;
-  color: rgba(255,255,255,0.7);
-  padding: 6px 10px;
-  border-radius: 999px;
-  font-size: 12px;
-  font-weight: 700;
-  font-family: var(--font-display);
-  cursor: pointer;
+.store-row input[type="text"] {
+  flex: 1;
 }
 
-.lang-switch button.active {
-  background: white;
-  color: var(--primary-dark);
+.store-manage-row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 10px 0;
+  border-bottom: 1px solid var(--border);
+}
+.store-manage-row:last-child { border-bottom: none; }
+
+.store-manage-row input[type="text"] {
+  flex: 1;
 }

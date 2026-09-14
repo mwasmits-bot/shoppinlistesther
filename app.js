@@ -5,7 +5,7 @@ import {
 } from "https://www.gstatic.com/firebasejs/10.13.0/firebase-firestore.js";
 
 const CFG = window.APP_CONFIG;
-const STORE_BRANDS = ["Aldi", "Albert Heijn", "Plus", "Jumbo"];
+const DEFAULT_STORES = ["Aldi", "Albert Heijn", "Plus", "Jumbo"];
 const STORE_ANY = "__any__";
 const STORE_OTHER = "__other__";
 const EMOJI_CHOICES = ["👸", "🤴", "🧑‍🚀", "👩‍🍳", "👨‍🔧", "🧑‍💻", "🐱", "🐶", "🦄", "🌟", "❤️", "😎", "🥳", "🍕", "⚽️", "🎨"];
@@ -56,15 +56,6 @@ function t(key, vars) {
   return s;
 }
 
-document.getElementById("lang-switch").querySelectorAll("button").forEach((b) => {
-  b.classList.toggle("active", b.dataset.lang === LANG);
-  b.addEventListener("click", () => {
-    if (b.dataset.lang === LANG) return;
-    localStorage.setItem(LANG_KEY, b.dataset.lang);
-    location.reload();
-  });
-});
-
 function applyStaticTranslations() {
   document.title = t("appTitle");
   document.documentElement.lang = LANG;
@@ -84,9 +75,13 @@ function applyStaticTranslations() {
   setText("txt-group-created-title", "groupCreatedTitle");
   setText("txt-group-created-share", "groupCreatedShare");
   setText("copy-code-btn", "copyCodeBtn");
+  setText("txt-choose-language", "chooseLanguage");
   setText("txt-who-uses-app", "whoUsesApp");
   setText("txt-add-at-least-one", "addAtLeastOne");
   setText("add-member-btn", "addMemberBtn");
+  setText("txt-stores-title", "storesTitle");
+  setText("txt-stores-intro", "storesIntro");
+  setText("add-store-btn", "addStoreBtn");
   setText("finish-setup-btn", "startAppBtn");
 
   setText("txt-group-screen-title", "groupScreenTitle");
@@ -94,8 +89,11 @@ function applyStaticTranslations() {
   setText("txt-your-group-code", "yourGroupCode");
   setText("txt-share-code-same-lists", "shareCodeSameLists");
   setText("copy-current-code-btn", "copyCodeBtn");
+  setText("txt-choose-language-2", "chooseLanguage");
   setText("txt-members-title", "membersTitle");
   document.getElementById("manage-add-member-btn").textContent = t("addMemberBtn");
+  setText("txt-stores-title-2", "storesTitle");
+  document.getElementById("manage-add-store-btn").textContent = t("addStoreBtn");
   setText("txt-other-group-title", "otherGroupTitle");
   setText("txt-leave-group-confirm-text", "leaveGroupConfirmText");
   setText("leave-group-btn", "leaveGroupBtn");
@@ -172,12 +170,20 @@ async function readGroupMeta(code) {
   try { return JSON.parse(localStorage.getItem(`boodschappenlijst_groupmeta_${code}`)); } catch { return null; }
 }
 
+/* Browsers vuren het "storage"-event alleen af in ándere tabs dan die de
+   wijziging deed — in lokale testmodus (zonder Firestore) zou een wijziging
+   in dit tabblad zelf dus nooit live doorkomen. Deze listener-set lost dat
+   op zodat lokaal testen zich hetzelfde gedraagt als Firestore, waar
+   onSnapshot wél voor de schrijver zelf afgaat. */
+const localGroupMetaListeners = new Set();
+
 async function writeGroupMeta(code, data) {
   if (usingFirestore) {
     await setDoc(doc(fbDb, "groups", code), data, { merge: true });
   } else {
     const current = (() => { try { return JSON.parse(localStorage.getItem(`boodschappenlijst_groupmeta_${code}`)); } catch { return null; } })() || {};
     localStorage.setItem(`boodschappenlijst_groupmeta_${code}`, JSON.stringify({ ...current, ...data }));
+    localGroupMetaListeners.forEach((fn) => fn());
   }
 }
 
@@ -192,9 +198,13 @@ function subscribeGroupMeta(code, cb) {
     cb(data);
   };
   run();
+  localGroupMetaListeners.add(run);
   const onStorage = (e) => { if (e.key === key) run(); };
   window.addEventListener("storage", onStorage);
-  return () => window.removeEventListener("storage", onStorage);
+  return () => {
+    localGroupMetaListeners.delete(run);
+    window.removeEventListener("storage", onStorage);
+  };
 }
 
 function createMemberRow(member, { onRemove, onChange }) {
@@ -250,8 +260,37 @@ function createMemberRow(member, { onRemove, onChange }) {
   return wrap;
 }
 
+function createStoreRow(store, { onRemove, onChange }) {
+  const row = document.createElement("div");
+  row.className = "store-row";
+
+  const input = document.createElement("input");
+  input.type = "text";
+  input.placeholder = t("storeNamePlaceholder");
+  input.value = store.name;
+  input.addEventListener("input", () => {
+    store.name = input.value;
+    if (onChange) onChange();
+  });
+
+  const removeBtn = document.createElement("button");
+  removeBtn.type = "button";
+  removeBtn.className = "remove-x";
+  removeBtn.textContent = "✕";
+  removeBtn.addEventListener("click", onRemove);
+
+  row.appendChild(input);
+  row.appendChild(removeBtn);
+  return row;
+}
+
 function runOnboarding() {
-  return new Promise((resolve) => {
+  // Deze promise wordt bewust nooit resolved: bij succes (groep gemaakt of
+  // gejoined) herladen we de pagina meteen, zodat de rest van de app in één
+  // keer met de juiste (groeps-)taal opnieuw opstart in plaats van halverwege
+  // dit script te moeten omschakelen. De await hieronder houdt de rest van
+  // app.js dus gewoon "on hold" tot die reload plaatsvindt.
+  return new Promise(() => {
     document.getElementById("screen-onboarding").hidden = false;
 
     const choiceCard = document.getElementById("onboarding-choice");
@@ -261,12 +300,25 @@ function runOnboarding() {
     const startBtn = document.getElementById("start-new-group-btn");
     const codeDisplay = document.getElementById("new-group-code");
     const copyBtn = document.getElementById("copy-code-btn");
+    const langButtons = document.getElementById("onboarding-lang-buttons");
     const finishBtn = document.getElementById("finish-setup-btn");
     const addMemberBtn = document.getElementById("add-member-btn");
     const memberList = document.getElementById("member-setup-list");
+    const storeList = document.getElementById("store-setup-list");
+    const addStoreBtn = document.getElementById("add-store-btn");
 
     let pendingCode = null;
     let setupMembers = [];
+    let setupStores = [];
+    let chosenLang = LANG;
+
+    langButtons.querySelectorAll("button").forEach((b) => {
+      b.classList.toggle("active", b.dataset.lang === chosenLang);
+      b.addEventListener("click", () => {
+        chosenLang = b.dataset.lang;
+        langButtons.querySelectorAll("button").forEach((x) => x.classList.toggle("active", x.dataset.lang === chosenLang));
+      });
+    });
 
     function refreshFinishBtn() {
       finishBtn.disabled = setupMembers.length === 0 || setupMembers.some((m) => !m.name.trim());
@@ -283,9 +335,19 @@ function runOnboarding() {
       refreshFinishBtn();
     }
 
-    function finishOnboarding(code) {
-      document.getElementById("screen-onboarding").hidden = true;
-      resolve(code);
+    function renderSetupStores() {
+      storeList.innerHTML = "";
+      setupStores.forEach((s, idx) => {
+        storeList.appendChild(createStoreRow(s, {
+          onRemove: () => { setupStores.splice(idx, 1); renderSetupStores(); }
+        }));
+      });
+    }
+
+    function completeOnboarding(code, lang) {
+      localStorage.setItem(GROUP_KEY, code);
+      localStorage.setItem(LANG_KEY, lang);
+      location.reload();
     }
 
     joinBtn.addEventListener("click", async () => {
@@ -295,8 +357,7 @@ function runOnboarding() {
       try {
         const meta = await readGroupMeta(code);
         if (!meta) { showToast(t("groupCodeNotFound")); return; }
-        localStorage.setItem(GROUP_KEY, code);
-        finishOnboarding(code);
+        completeOnboarding(code, meta.lang || LANG);
       } catch (err) {
         console.error(err);
         showToast(t("genericError"));
@@ -312,7 +373,9 @@ function runOnboarding() {
         { id: crypto.randomUUID(), name: "", emoji: EMOJI_CHOICES[0] },
         { id: crypto.randomUUID(), name: "", emoji: EMOJI_CHOICES[1] }
       ];
+      setupStores = DEFAULT_STORES.map((name) => ({ name }));
       renderSetupMembers();
+      renderSetupStores();
       choiceCard.hidden = true;
       setupCard.hidden = false;
     });
@@ -331,15 +394,21 @@ function runOnboarding() {
       renderSetupMembers();
     });
 
+    addStoreBtn.addEventListener("click", () => {
+      setupStores.push({ name: "" });
+      renderSetupStores();
+    });
+
     finishBtn.addEventListener("click", async () => {
       finishBtn.disabled = true;
       try {
         await writeGroupMeta(pendingCode, {
           members: setupMembers.map((m) => ({ id: m.id, name: m.name.trim(), emoji: m.emoji })),
+          stores: setupStores.map((s) => s.name.trim()).filter(Boolean),
+          lang: chosenLang,
           createdAt: new Date().toISOString()
         });
-        localStorage.setItem(GROUP_KEY, pendingCode);
-        finishOnboarding(pendingCode);
+        completeOnboarding(pendingCode, chosenLang);
       } catch (err) {
         console.error(err);
         showToast(t("createGroupFailed"));
@@ -356,6 +425,7 @@ if (!groupCode) {
 document.getElementById("app-root").hidden = false;
 
 let groupMembers = [];
+let groupStores = DEFAULT_STORES;
 
 function createAssigneeToggle(currentValue, onSet) {
   const group = document.createElement("div");
@@ -714,14 +784,22 @@ const storeOtherInput = document.getElementById("store-other-input");
 const customSubjectWrap = document.getElementById("custom-subject-wrap");
 const customSubjectInput = document.getElementById("custom-subject-input");
 
-[...STORE_BRANDS, STORE_ANY, STORE_OTHER].forEach((s) => {
-  const btn = document.createElement("button");
-  btn.type = "button";
-  btn.dataset.value = s;
-  btn.textContent = s === STORE_ANY ? t("storeAny") : s === STORE_OTHER ? t("storeOther") : s;
-  btn.addEventListener("click", () => setStore(s));
-  storeButtons.appendChild(btn);
-});
+/* Winkels zijn per groep instelbaar (zie groupStores) — de knoppenrij
+   wordt daarom herbouwd zodra de groepsinstellingen binnenkomen/wijzigen,
+   niet één keer vast bij het laden van de pagina. */
+function renderStoreButtons() {
+  const currentValue = storeSelect.value;
+  storeButtons.innerHTML = "";
+  [...groupStores, STORE_ANY, STORE_OTHER].forEach((s) => {
+    const btn = document.createElement("button");
+    btn.type = "button";
+    btn.dataset.value = s;
+    btn.textContent = s === STORE_ANY ? t("storeAny") : s === STORE_OTHER ? t("storeOther") : s;
+    btn.classList.toggle("active", s === currentValue);
+    btn.addEventListener("click", () => setStore(s));
+    storeButtons.appendChild(btn);
+  });
+}
 
 function itemPlaceholderFor(subject) {
   switch (subject) {
@@ -1457,6 +1535,8 @@ const groupInfoBtn = document.getElementById("group-info-btn");
 const screenGroupSettings = document.getElementById("screen-groupsettings");
 const appRoot = document.getElementById("app-root");
 const memberManageList = document.getElementById("member-manage-list");
+const storeManageList = document.getElementById("store-manage-list");
+const settingsLangButtons = document.getElementById("settings-lang-buttons");
 
 function persistMembers() {
   writeGroupMeta(groupCode, {
@@ -1481,11 +1561,59 @@ function renderMemberManageList() {
   });
 }
 
+function persistStores() {
+  writeGroupMeta(groupCode, {
+    stores: groupStores.map((s) => (typeof s === "string" ? s : s.name).trim()).filter(Boolean)
+  }).catch((err) => {
+    console.error(err);
+    showToast(t("saveFailedToast"));
+  });
+}
+
+function renderStoreManageList() {
+  storeManageList.innerHTML = "";
+  // createStoreRow muteert store.name via closures, dus werk op mutable
+  // {name}-objecten en zet pas bij het opslaan om naar platte strings.
+  const editable = groupStores.map((s) => ({ name: typeof s === "string" ? s : s.name }));
+  editable.forEach((s, idx) => {
+    storeManageList.appendChild(createStoreRow(s, {
+      onRemove: () => {
+        editable.splice(idx, 1);
+        groupStores = editable.map((x) => x.name);
+        persistStores();
+        renderStoreManageList();
+      },
+      onChange: () => {
+        groupStores = editable.map((x) => x.name);
+        persistStores();
+      }
+    }));
+  });
+}
+
 groupInfoBtn.addEventListener("click", () => {
   document.getElementById("current-group-code").textContent = formatCode(groupCode);
+  settingsLangButtons.querySelectorAll("button").forEach((b) => b.classList.toggle("active", b.dataset.lang === LANG));
   renderMemberManageList();
+  renderStoreManageList();
   appRoot.hidden = true;
   screenGroupSettings.hidden = false;
+});
+
+settingsLangButtons.querySelectorAll("button").forEach((b) => {
+  b.addEventListener("click", () => {
+    const newLang = b.dataset.lang;
+    if (newLang === LANG) return;
+    writeGroupMeta(groupCode, { lang: newLang })
+      .then(() => {
+        localStorage.setItem(LANG_KEY, newLang);
+        location.reload();
+      })
+      .catch((err) => {
+        console.error(err);
+        showToast(t("saveFailedToast"));
+      });
+  });
 });
 
 document.getElementById("close-groupsettings-btn").addEventListener("click", () => {
@@ -1508,18 +1636,36 @@ document.getElementById("manage-add-member-btn").addEventListener("click", () =>
   renderMemberManageList();
 });
 
+document.getElementById("manage-add-store-btn").addEventListener("click", () => {
+  groupStores = [...groupStores, ""];
+  renderStoreManageList();
+});
+
 document.getElementById("leave-group-btn").addEventListener("click", () => {
   if (!confirm(t("leaveGroupConfirmText"))) return;
   localStorage.removeItem(GROUP_KEY);
   location.reload();
 });
 
-/* Leden live synchroniseren tussen toestellen */
+/* Leden/winkels/taal live synchroniseren tussen toestellen. Verandert de
+   taal op een ander toestel (via de instellingen hierboven), dan herladen
+   we hier ook — anders lopen twee toestellen in dezelfde groep blijvend
+   uiteen in taal. */
 subscribeGroupMeta(groupCode, (meta) => {
+  if (meta && meta.lang && meta.lang !== LANG) {
+    localStorage.setItem(LANG_KEY, meta.lang);
+    location.reload();
+    return;
+  }
   groupMembers = (meta && Array.isArray(meta.members)) ? meta.members : [];
+  groupStores = (meta && Array.isArray(meta.stores) && meta.stores.length > 0) ? meta.stores : DEFAULT_STORES;
   renderAssigneeFilterButtons();
+  renderStoreButtons();
   renderDraftList();
   renderHistory();
   renderShopperLists();
-  if (!screenGroupSettings.hidden) renderMemberManageList();
+  if (!screenGroupSettings.hidden) {
+    renderMemberManageList();
+    renderStoreManageList();
+  }
 });

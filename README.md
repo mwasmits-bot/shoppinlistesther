@@ -102,10 +102,17 @@ groep die dezelfde app-installatie gebruikt.
 
 ## Hoe de app werkt
 
-- **Eerste keer openen**: je kiest of je een **nieuwe groep start** (je krijgt een groepscode
-  zoals `WOLF-4821` om te delen, en stelt de leden in met naam + emoji) of **meedoet met een
-  bestaande groep** (groepscode invullen die je van iemand kreeg). Die code wordt op het toestel
-  onthouden; je hoeft 'm maar één keer in te vullen.
+- **Eerste keer openen**: je kiest of je een **nieuwe groep start** of **meedoet met een bestaande
+  groep** (groepscode invullen die je van iemand kreeg — je taal komt dan automatisch overeen met
+  die van de groep). Bij het starten van een nieuwe groep kies je in één scherm:
+  - de **taal** van de app (Nederlands/Deutsch/English) — geldt voor de hele groep, niet per
+    toestel; dit is bewust geen schakelaar die je steeds aanzet, maar een keuze die je bij het
+    aanmaken doet (en later kunt wijzigen via de 👥-knop, zie hieronder);
+  - de **leden** met naam + emoji;
+  - de **winkels** — een voorgestelde lijst (Aldi, Albert Heijn, Plus, Jumbo) die je vrij mag
+    aanpassen: verwijder wat niet relevant is, voeg toe wat wél bij jullie past (bijv. Migros/Coop
+    voor een Zwitserse groep).
+  De groepscode wordt op het toestel onthouden; je hoeft 'm maar één keer in te vullen.
 - **"Maak lijst"**: onderwerp kiezen (Boodschappen + winkel, Klusjes, Tuin/Huis, Cadeaus, of
   Overig), producten toevoegen (met optioneel een link of foto-URL), eventueel toewijzen aan een
   groepslid, en versturen. De rest van de groep krijgt dan een pushmelding (zie stap 3 hierboven).
@@ -113,14 +120,15 @@ groep die dezelfde app-installatie gebruikt.
   toe/herwijs toe aan een groepslid, en kunt een product als **"⚠️ Niet beschikbaar"** melden met
   een kort briefje. Met de kleine **"Lijst afronden"**-knop sluit je de lijst af (en kun je 'm in
   de "Klaar"-tab weer heropenen als dat per ongeluk was).
-- **👥-knop rechtsboven**: bekijk/kopieer de groepscode, beheer de leden (toevoegen, hernoemen,
-  emoji wijzigen, verwijderen), of verlaat de groep (je lijstjes blijven bewaard — met de code kun
-  je altijd terug).
+- **👥-knop rechtsboven**: bekijk/kopieer de groepscode, wijzig de **taal** van de groep, beheer de
+  **leden** (toevoegen, hernoemen, emoji wijzigen, verwijderen), pas de **winkels** aan, of verlaat
+  de groep (je lijstjes blijven bewaard — met de code kun je altijd terug). Wijzig je de taal, dan
+  herladen alle toestellen in de groep automatisch mee naar de nieuwe taal.
 - De app onthoudt op elk toestel welke rol (Maak lijst/Winkelen) je laatst gebruikte.
-- **Taal**: rechtsonder staat een NL/DE/EN-schakelaar. De keuze wordt per toestel onthouden (elk
-  toestel kan een andere taal hebben, ook binnen dezelfde groep) en werkt de hele app door — ideaal
-  als een vriendengroep in een andere taal wil meedoen. Nieuwe vertalingen toevoegen kan in
-  [`i18n.js`](i18n.js).
+
+Nieuwe taal toevoegen kan in [`i18n.js`](i18n.js) (kopieer een taalblok, vertaal de waardes, voeg
+de taalcode toe aan `SUPPORTED_LANGS` in `app.js` en een knop in de twee taal-keuzeblokken in
+`index.html`).
 
 ## Zonder Firebase testen
 
