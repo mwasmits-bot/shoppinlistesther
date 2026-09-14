@@ -5,7 +5,9 @@ import {
 } from "https://www.gstatic.com/firebasejs/10.13.0/firebase-firestore.js";
 
 const CFG = window.APP_CONFIG;
-const STORES = ["Aldi", "Albert Heijn", "Plus", "Jumbo", "Maakt niet uit", "Anders"];
+const STORE_BRANDS = ["Aldi", "Albert Heijn", "Plus", "Jumbo"];
+const STORE_ANY = "__any__";
+const STORE_OTHER = "__other__";
 const EMOJI_CHOICES = ["👸", "🤴", "🧑‍🚀", "👩‍🍳", "👨‍🔧", "🧑‍💻", "🐱", "🐶", "🦄", "🌟", "❤️", "😎", "🥳", "🍕", "⚽️", "🎨"];
 
 const usingFirestore = Boolean(CFG.firebase.apiKey);
@@ -23,6 +25,121 @@ function showToast(msg, duration = 3000) {
   clearTimeout(toastTimer);
   toastTimer = setTimeout(() => el.classList.remove("show"), duration);
 }
+
+/* ---------------------------------------------------------
+   TAAL — vertalingen staan in i18n.js (window.I18N). De taal wordt
+   per toestel onthouden; wisselen herlaadt de pagina zodat alle
+   tekst (ook al gerenderde lijsten/geschiedenis) gegarandeerd
+   consistent is, in plaats van overal losse re-renders te moeten
+   coördineren.
+--------------------------------------------------------- */
+
+const LANG_KEY = "boodschappenlijst_lang";
+const SUPPORTED_LANGS = ["nl", "de", "en"];
+
+function detectLang() {
+  const saved = localStorage.getItem(LANG_KEY);
+  if (SUPPORTED_LANGS.includes(saved)) return saved;
+  const nav = (navigator.language || "nl").slice(0, 2).toLowerCase();
+  return SUPPORTED_LANGS.includes(nav) ? nav : "nl";
+}
+
+const LANG = detectLang();
+const STRINGS = window.I18N[LANG] || window.I18N.nl;
+const DATE_LOCALES = { nl: "nl-NL", de: "de-DE", en: "en-GB" };
+
+function t(key, vars) {
+  let s = STRINGS[key] ?? window.I18N.nl[key] ?? key;
+  if (vars) {
+    for (const [k, v] of Object.entries(vars)) s = s.split(`{${k}}`).join(v);
+  }
+  return s;
+}
+
+document.getElementById("lang-switch").querySelectorAll("button").forEach((b) => {
+  b.classList.toggle("active", b.dataset.lang === LANG);
+  b.addEventListener("click", () => {
+    if (b.dataset.lang === LANG) return;
+    localStorage.setItem(LANG_KEY, b.dataset.lang);
+    location.reload();
+  });
+});
+
+function applyStaticTranslations() {
+  document.title = t("appTitle");
+  document.documentElement.lang = LANG;
+
+  const setText = (id, key) => { const el = document.getElementById(id); if (el) el.textContent = t(key); };
+  const setPlaceholder = (id, key) => { const el = document.getElementById(id); if (el) el.placeholder = t(key); };
+
+  setText("txt-app-title", "appTitle");
+  setText("txt-app-title-2", "appTitle");
+  setText("txt-onboarding-welcome", "onboardingWelcome");
+  setText("txt-onboarding-intro", "onboardingIntro");
+  setText("txt-group-code-label", "groupCodeLabel");
+  setPlaceholder("join-code-input", "groupCodePlaceholder");
+  setText("join-group-btn", "joinGroupBtn");
+  setText("txt-or-divider", "orDivider");
+  setText("start-new-group-btn", "startNewGroupBtn");
+  setText("txt-group-created-title", "groupCreatedTitle");
+  setText("txt-group-created-share", "groupCreatedShare");
+  setText("copy-code-btn", "copyCodeBtn");
+  setText("txt-who-uses-app", "whoUsesApp");
+  setText("txt-add-at-least-one", "addAtLeastOne");
+  setText("add-member-btn", "addMemberBtn");
+  setText("finish-setup-btn", "startAppBtn");
+
+  setText("txt-group-screen-title", "groupScreenTitle");
+  document.getElementById("close-groupsettings-btn").title = t("backTitle");
+  setText("txt-your-group-code", "yourGroupCode");
+  setText("txt-share-code-same-lists", "shareCodeSameLists");
+  setText("copy-current-code-btn", "copyCodeBtn");
+  setText("txt-members-title", "membersTitle");
+  document.getElementById("manage-add-member-btn").textContent = t("addMemberBtn");
+  setText("txt-other-group-title", "otherGroupTitle");
+  setText("txt-leave-group-confirm-text", "leaveGroupConfirmText");
+  setText("leave-group-btn", "leaveGroupBtn");
+  document.getElementById("group-info-btn").title = t("groupInfoTitle");
+  document.getElementById("push-toggle-btn").title = t("notificationsOffTitle");
+
+  document.querySelector('.role-switch button[data-role="maker"]').textContent = t("roleMaker");
+  document.querySelector('.role-switch button[data-role="shopper"]').textContent = t("roleShopper");
+
+  document.getElementById("config-banner").textContent = t("configBanner");
+
+  setText("txt-new-list-title", "newListTitle");
+  setText("txt-subject-label", "subjectLabel");
+  document.querySelector('#subject-buttons [data-value="Boodschappen"]').textContent = t("subjectGroceries");
+  document.querySelector('#subject-buttons [data-value="Klusjes / Meenemen"]').textContent = t("subjectChores");
+  document.querySelector('#subject-buttons [data-value="Tuin / Huis"]').textContent = t("subjectGarden");
+  document.querySelector('#subject-buttons [data-value="Cadeaus"]').textContent = t("subjectGifts");
+  document.querySelector('#subject-buttons [data-value="Overig"]').textContent = t("subjectOther");
+  setText("txt-description-label", "descriptionLabel");
+  setPlaceholder("custom-subject-input", "descriptionPlaceholder");
+  setText("txt-store-label", "storeLabel");
+  setText("txt-which-store-label", "whichStoreLabel");
+  setPlaceholder("store-other-input", "storeNamePlaceholder");
+  setText("txt-products-label", "productsLabel");
+  document.getElementById("add-item-btn").textContent = t("addBtn");
+  document.getElementById("item-extra-toggle").textContent = t("addLinkToggle");
+  setPlaceholder("item-link-input", "linkPlaceholder");
+  setPlaceholder("item-image-input", "imagePlaceholder");
+  document.getElementById("draft-empty").textContent = t("noProductsYet");
+  document.getElementById("send-list-btn").textContent = t("sendListBtn");
+  document.getElementById("clear-draft-btn").textContent = t("clearDraftBtn");
+
+  setText("txt-history-title", "historyTitle");
+  document.querySelector('.history-tab-btn[data-tab="open"]').textContent = t("tabActive");
+  document.querySelector('.history-tab-btn[data-tab="finished"]').textContent = t("tabDone");
+  setText("txt-filter-by-assignee", "filterByAssignee");
+  document.querySelector('#assignee-filter [data-assignee="all"]').textContent = t("filterAll");
+  document.querySelector('#assignee-filter [data-assignee="none"]').textContent = t("filterUnassigned");
+  document.getElementById("clear-finished-btn").textContent = t("clearFinishedBtn");
+  document.getElementById("history-empty").textContent = t("noListsYet");
+
+  document.getElementById("shopper-empty").textContent = t("noActiveListsNow");
+}
+applyStaticTranslations();
 
 /* ---------------------------------------------------------
    GROEP — de app is gescheiden per groep (gezin/vriendengroep).
@@ -93,7 +210,7 @@ function createMemberRow(member, { onRemove, onChange }) {
 
   const nameInput = document.createElement("input");
   nameInput.type = "text";
-  nameInput.placeholder = "Naam";
+  nameInput.placeholder = t("namePlaceholder");
   nameInput.value = member.name;
   nameInput.addEventListener("input", () => {
     member.name = nameInput.value;
@@ -173,16 +290,16 @@ function runOnboarding() {
 
     joinBtn.addEventListener("click", async () => {
       const code = normalizeCode(joinInput.value);
-      if (code.length < 4) { showToast("Vul een geldige groepscode in ⚠️"); return; }
+      if (code.length < 4) { showToast(t("invalidGroupCode")); return; }
       joinBtn.disabled = true;
       try {
         const meta = await readGroupMeta(code);
-        if (!meta) { showToast("Groepscode niet gevonden — check de spelling ⚠️"); return; }
+        if (!meta) { showToast(t("groupCodeNotFound")); return; }
         localStorage.setItem(GROUP_KEY, code);
         finishOnboarding(code);
       } catch (err) {
         console.error(err);
-        showToast("Er ging iets mis ⚠️");
+        showToast(t("genericError"));
       } finally {
         joinBtn.disabled = false;
       }
@@ -203,9 +320,9 @@ function runOnboarding() {
     copyBtn.addEventListener("click", async () => {
       try {
         await navigator.clipboard.writeText(formatCode(pendingCode));
-        showToast("Code gekopieerd 📋");
+        showToast(t("codeCopied"));
       } catch {
-        showToast("Kopiëren niet gelukt — noteer 'm handmatig");
+        showToast(t("copyFailedNote"));
       }
     });
 
@@ -225,7 +342,7 @@ function runOnboarding() {
         finishOnboarding(pendingCode);
       } catch (err) {
         console.error(err);
-        showToast("Aanmaken mislukt ⚠️");
+        showToast(t("createGroupFailed"));
         finishBtn.disabled = false;
       }
     });
@@ -265,7 +382,7 @@ function createBulkAssignRow(items, onApplyAll) {
 
   const label = document.createElement("span");
   label.className = "meta";
-  label.textContent = "Alles toewijzen aan:";
+  label.textContent = t("assignAllTo");
   wrap.appendChild(label);
 
   wrap.appendChild(createAssigneeToggle(null, onApplyAll));
@@ -505,7 +622,7 @@ function updatePushButton() {
   if (!pushSupported) return;
   const on = Notification.permission === "granted" && localStorage.getItem(PUSH_SUB_KEY) === "1";
   pushToggleBtn.textContent = on ? "🔔" : "🔕";
-  pushToggleBtn.title = on ? "Meldingen staan aan (tik om uit te zetten)" : "Meldingen aanzetten";
+  pushToggleBtn.title = on ? t("notificationsOnTitle") : t("notificationsOffTitle");
 }
 
 async function enablePush() {
@@ -513,7 +630,7 @@ async function enablePush() {
     const reg = await navigator.serviceWorker.register("sw.js");
     const permission = await Notification.requestPermission();
     if (permission !== "granted") {
-      showToast("Meldingen niet toegestaan");
+      showToast(t("notificationsDenied"));
       return;
     }
     const sub = await reg.pushManager.subscribe({
@@ -523,11 +640,11 @@ async function enablePush() {
     const id = await subIdFor(sub.endpoint);
     await backend.savePushSubscription(id, sub.toJSON());
     localStorage.setItem(PUSH_SUB_KEY, "1");
-    showToast("Meldingen aangezet 🔔");
+    showToast(t("notificationsEnabled"));
   } catch (err) {
     console.error("Push subscribe error:", err);
     const detail = [err?.name, err?.message].filter(Boolean).join(": ") || String(err);
-    showToast(`Meldingen aanzetten mislukt ⚠️ (${detail})`, 8000);
+    showToast(t("notificationsEnableFailed", { detail }), 8000);
   }
   updatePushButton();
 }
@@ -545,7 +662,7 @@ async function disablePush() {
     console.error("Push unsubscribe error:", err);
   }
   localStorage.removeItem(PUSH_SUB_KEY);
-  showToast("Meldingen uitgezet");
+  showToast(t("notificationsDisabled"));
   updatePushButton();
 }
 
@@ -573,13 +690,13 @@ async function notifyListChange({ title, body, listId, role = "shopper" }) {
     const data = await res.json().catch(() => ({}));
     if (!res.ok || data.reason) {
       console.error("Push notify failed:", res.status, data);
-      showToast(`Melding versturen mislukt: ${data.message || data.reason || res.status} ⚠️`, 8000);
+      showToast(t("pushSendFailed", { reason: data.message || data.reason || res.status }), 8000);
     } else if (data.sent === 0) {
-      showToast("Lijst verstuurd, maar niemand heeft meldingen aan staan 🔕", 6000);
+      showToast(t("pushNoSubscribers"), 6000);
     }
   } catch (err) {
     console.error("Push notify error:", err);
-    showToast(`Melding versturen mislukt: ${err.message} ⚠️`, 8000);
+    showToast(t("pushSendFailed", { reason: err.message }), 8000);
   }
 }
 
@@ -597,22 +714,38 @@ const storeOtherInput = document.getElementById("store-other-input");
 const customSubjectWrap = document.getElementById("custom-subject-wrap");
 const customSubjectInput = document.getElementById("custom-subject-input");
 
-STORES.forEach((s) => {
+[...STORE_BRANDS, STORE_ANY, STORE_OTHER].forEach((s) => {
   const btn = document.createElement("button");
   btn.type = "button";
   btn.dataset.value = s;
-  btn.textContent = s;
+  btn.textContent = s === STORE_ANY ? t("storeAny") : s === STORE_OTHER ? t("storeOther") : s;
   btn.addEventListener("click", () => setStore(s));
   storeButtons.appendChild(btn);
 });
 
-const ITEM_PLACEHOLDERS = {
-  "Boodschappen": "Bijv. Melk",
-  "Klusjes / Meenemen": "Bijv. Paspoort meenemen",
-  "Tuin / Huis": "Bijv. Gras maaien",
-  "Cadeaus": "Bijv. LEGO-set",
-  "Overig": "Naam item"
-};
+function itemPlaceholderFor(subject) {
+  switch (subject) {
+    case "Boodschappen": return t("itemPlaceholderGroceries");
+    case "Klusjes / Meenemen": return t("itemPlaceholderChores");
+    case "Tuin / Huis": return t("itemPlaceholderGarden");
+    case "Cadeaus": return t("itemPlaceholderGifts");
+    default: return t("itemPlaceholderOther");
+  }
+}
+
+/* Een opgeslagen lijst bewaart het onderwerp als vaste interne waarde
+   (bijv. "Boodschappen"), zodat die waarde ongeacht de taal herkenbaar
+   blijft. Bij weergave vertalen we 'm alsnog; een eigen ("Overig")
+   onderwerp is al vrije tekst en komt ongewijzigd door. */
+function subjectDisplayLabel(subject) {
+  switch (subject) {
+    case "Boodschappen": return t("subjectLabelGroceries");
+    case "Klusjes / Meenemen": return t("subjectLabelChores");
+    case "Tuin / Huis": return t("subjectLabelGarden");
+    case "Cadeaus": return t("subjectLabelGifts");
+    default: return subject;
+  }
+}
 
 function setSubject(value) {
   subjectSelect.value = value;
@@ -621,7 +754,7 @@ function setSubject(value) {
   });
   storeWrap.hidden = value !== "Boodschappen";
   customSubjectWrap.hidden = value !== "Overig";
-  itemNameInput.placeholder = ITEM_PLACEHOLDERS[value] || "Naam item";
+  itemNameInput.placeholder = itemPlaceholderFor(value);
   // Bij cadeaus is een link naar het product zo waardevol dat we het
   // invoerveld meteen openklappen in plaats van achter een toggle te verstoppen.
   itemExtraWrap.hidden = value !== "Cadeaus";
@@ -633,7 +766,7 @@ function setStore(value) {
   storeButtons.querySelectorAll("button").forEach((b) => {
     b.classList.toggle("active", b.dataset.value === value);
   });
-  storeOtherWrap.hidden = value !== "Anders";
+  storeOtherWrap.hidden = value !== STORE_OTHER;
   saveDraft();
 }
 
@@ -784,7 +917,7 @@ renderDraftList();
 const clearDraftBtn = document.getElementById("clear-draft-btn");
 clearDraftBtn.addEventListener("click", () => {
   if (draftItems.length === 0) return;
-  if (!confirm("Concept wissen? Alles wat je tot nu toe hebt toegevoegd gaat dan verloren.")) return;
+  if (!confirm(t("clearDraftConfirm"))) return;
   draftItems = [];
   setSubject("Boodschappen");
   setStore("");
@@ -797,22 +930,24 @@ clearDraftBtn.addEventListener("click", () => {
 sendListBtn.addEventListener("click", async () => {
   const subject = subjectSelect.value === "Overig" ? customSubjectInput.value.trim() : subjectSelect.value;
   if (!subject) { customSubjectInput.focus(); return; }
-  if (subjectSelect.value === "Boodschappen" && !storeSelect.value) { showToast("Kies eerst een winkel ⚠️"); return; }
+  if (subjectSelect.value === "Boodschappen" && !storeSelect.value) { showToast(t("chooseStoreFirst")); return; }
   if (draftItems.length === 0) return;
 
   let store = null;
   if (subjectSelect.value === "Boodschappen") {
-    store = storeSelect.value === "Anders" ? storeOtherInput.value.trim() : storeSelect.value;
+    store = storeSelect.value === STORE_OTHER ? storeOtherInput.value.trim()
+      : storeSelect.value === STORE_ANY ? t("storeAny")
+      : storeSelect.value;
   }
 
   sendListBtn.disabled = true;
-  sendListBtn.textContent = "Versturen…";
+  sendListBtn.textContent = t("sendingBtn");
 
   try {
     const id = await backend.createList({ subject, store, items: draftItems });
     notifyListChange({
-      title: `Nieuw lijstje: ${subject}`,
-      body: `${store ? store + " · " : ""}${draftItems.length} ding(en)`,
+      title: t("newListNotifTitle", { subject: subjectDisplayLabel(subject) }),
+      body: t("newListNotifBody", { storePrefix: store ? store + " · " : "", count: draftItems.length }),
       listId: id
     });
 
@@ -824,13 +959,13 @@ sendListBtn.addEventListener("click", async () => {
     customSubjectInput.value = "";
     clearDraft();
 
-    showToast("Lijst verstuurd ✅");
+    showToast(t("listSentToast"));
   } catch (err) {
     console.error(err);
-    showToast("Er ging iets mis bij het versturen ⚠️");
+    showToast(t("sendErrorToast"));
   } finally {
     sendListBtn.disabled = false;
-    sendListBtn.textContent = "📤 Lijst versturen";
+    sendListBtn.textContent = t("sendListBtn");
   }
 });
 
@@ -881,14 +1016,14 @@ function renderAssigneeFilterButtons() {
 clearFinishedBtn.addEventListener("click", async () => {
   const finished = lastHistoryLists.filter((l) => l.status === "finished");
   if (finished.length === 0) return;
-  if (!confirm(`${finished.length} afgeronde lijstje(s) definitief wissen?`)) return;
+  if (!confirm(t("clearFinishedConfirm", { count: finished.length }))) return;
   clearFinishedBtn.disabled = true;
   try {
     await Promise.all(finished.map((l) => backend.deleteList(l.id)));
-    showToast("Afgeronde lijstjes gewist 🗑️");
+    showToast(t("clearedFinishedToast"));
   } catch (err) {
     console.error(err);
-    showToast("Wissen mislukt ⚠️");
+    showToast(t("clearFailedToast"));
   } finally {
     clearFinishedBtn.disabled = false;
   }
@@ -904,8 +1039,8 @@ function renderHistory() {
   historyList.innerHTML = "";
   historyEmpty.hidden = filtered.length > 0;
   historyEmpty.textContent = historyTab === "open"
-    ? "Geen actieve lijstjes."
-    : "Geen afgeronde lijstjes.";
+    ? t("noActiveLists")
+    : t("noFinishedLists");
   clearFinishedBtn.hidden = !(historyTab === "finished" && filtered.length > 0);
 
   filtered.forEach((list) => {
@@ -918,8 +1053,8 @@ function renderHistory() {
     const unavailableCount = list.items.filter((i) => i.unavailable).length;
     const expanded = expandedHistoryIds.has(list.id);
     row.innerHTML = `
-      <span>${expanded ? "▾" : "▸"} ${escapeHtml(list.subject)}${list.store ? " · " + escapeHtml(list.store) : ""}
-        <span class="meta">(${checkedCount}/${list.items.length}${unavailableCount ? `, <span style="color:var(--danger); font-weight:600;">${unavailableCount} niet beschikbaar</span>` : ""})</span>
+      <span>${expanded ? "▾" : "▸"} ${escapeHtml(subjectDisplayLabel(list.subject))}${list.store ? " · " + escapeHtml(list.store) : ""}
+        <span class="meta">(${checkedCount}/${list.items.length}${unavailableCount ? `, <span style="color:var(--danger); font-weight:600;">${t("unavailableCountLabel", { count: unavailableCount })}</span>` : ""})</span>
       </span>
     `;
 
@@ -930,23 +1065,23 @@ function renderHistory() {
     statusWrap.style.flexShrink = "0";
     const pill = document.createElement("span");
     pill.className = `status-pill ${list.status}`;
-    pill.textContent = list.status === "open" ? "Actief" : "Klaar";
+    pill.textContent = list.status === "open" ? t("statusActive") : t("statusDone");
     statusWrap.appendChild(pill);
 
     if (list.status === "finished") {
       const reopenBtn = document.createElement("button");
       reopenBtn.className = "history-delete-btn";
       reopenBtn.type = "button";
-      reopenBtn.title = "Lijst heropenen";
+      reopenBtn.title = t("reopenTitle");
       reopenBtn.textContent = "↩️";
       reopenBtn.addEventListener("click", async (e) => {
         e.stopPropagation();
         try {
           await backend.reopenList(list.id);
-          showToast("Lijst heropend ↩️");
+          showToast(t("reopenedToast"));
         } catch (err) {
           console.error(err);
-          showToast("Heropenen mislukt ⚠️");
+          showToast(t("reopenFailedToast"));
         }
       });
       statusWrap.appendChild(reopenBtn);
@@ -954,16 +1089,16 @@ function renderHistory() {
       const delBtn = document.createElement("button");
       delBtn.className = "history-delete-btn";
       delBtn.type = "button";
-      delBtn.title = "Lijst verwijderen";
+      delBtn.title = t("deleteTitle");
       delBtn.textContent = "🗑️";
       delBtn.addEventListener("click", async (e) => {
         e.stopPropagation();
-        if (!confirm(`"${list.subject}${list.store ? " · " + list.store : ""}" definitief verwijderen?`)) return;
+        if (!confirm(t("deleteConfirm", { name: `${subjectDisplayLabel(list.subject)}${list.store ? " · " + list.store : ""}` }))) return;
         try {
           await backend.deleteList(list.id);
         } catch (err) {
           console.error(err);
-          showToast("Verwijderen mislukt ⚠️");
+          showToast(t("deleteFailedToast"));
         }
       });
       statusWrap.appendChild(delBtn);
@@ -993,7 +1128,7 @@ function renderHistory() {
         item.assignee = value;
         backend.updateItems(list.id, list.items).catch((err) => {
           console.error(err);
-          showToast("Toewijzen mislukt ⚠️");
+          showToast(t("assignFailedToast"));
         });
       }));
 
@@ -1002,7 +1137,7 @@ function renderHistory() {
         note.className = "unavailable-note";
         note.style.marginTop = "2px";
         note.style.width = "100%";
-        note.textContent = "⚠️ Niet beschikbaar" + (item.feedback ? ": " + item.feedback : "");
+        note.textContent = t("unavailableLabel") + (item.feedback ? ": " + item.feedback : "");
         line.appendChild(note);
       }
       detail.appendChild(line);
@@ -1013,7 +1148,7 @@ function renderHistory() {
         list.items.forEach((i) => { i.assignee = value; });
         backend.updateItems(list.id, list.items).catch((err) => {
           console.error(err);
-          showToast("Toewijzen mislukt ⚠️");
+          showToast(t("assignFailedToast"));
         });
       }));
     }
@@ -1025,12 +1160,12 @@ function renderHistory() {
 
       const input = document.createElement("input");
       input.type = "text";
-      input.placeholder = "Nog iets toevoegen…";
+      input.placeholder = t("addMoreItemPlaceholder");
 
       const btn = document.createElement("button");
       btn.type = "button";
       btn.className = "btn btn-primary";
-      btn.textContent = "+ Toevoegen";
+      btn.textContent = t("addBtn");
 
       const submitAdd = async () => {
         const name = input.value.trim();
@@ -1049,15 +1184,15 @@ function renderHistory() {
         try {
           await backend.updateItems(list.id, [...list.items, newItem]);
           input.value = "";
-          showToast("Toegevoegd aan de lijst ✅");
+          showToast(t("addedToListToast"));
           notifyListChange({
-            title: `Lijst aangevuld: ${list.subject}`,
+            title: t("listUpdatedNotifTitle", { subject: subjectDisplayLabel(list.subject) }),
             body: `+ ${name}`,
             listId: list.id
           });
         } catch (err) {
           console.error(err);
-          showToast("Toevoegen mislukt ⚠️");
+          showToast(t("addFailedToast"));
         } finally {
           btn.disabled = false;
           input.focus();
@@ -1077,7 +1212,7 @@ function renderHistory() {
       const lockedNote = document.createElement("p");
       lockedNote.className = "meta";
       lockedNote.style.marginTop = "8px";
-      lockedNote.textContent = "🔒 Deze lijst is afgerond en kan niet meer aangevuld worden.";
+      lockedNote.textContent = t("lockedListNote");
       detail.appendChild(lockedNote);
     }
 
@@ -1141,12 +1276,12 @@ function renderShopperCard(list) {
   header.innerHTML = `
     <div class="list-card-header">
       <div>
-        <span class="subject-tag">${escapeHtml(list.subject)}${list.store ? " · " + escapeHtml(list.store) : ""}</span>
+        <span class="subject-tag">${escapeHtml(subjectDisplayLabel(list.subject))}${list.store ? " · " + escapeHtml(list.store) : ""}</span>
       </div>
       <span class="meta">${list.createdAt ? formatDate(list.createdAt) : ""}</span>
     </div>
     <div class="progress-bar"><div class="progress-bar-fill" style="width:${pct}%"></div></div>
-    <div class="meta">${checked}/${total} gepakt</div>
+    <div class="meta">${t("pickedCount", { checked, total })}</div>
   `;
   card.appendChild(header);
 
@@ -1170,15 +1305,18 @@ function renderShopperCard(list) {
   finishBtn.className = "btn btn-secondary";
   finishBtn.style.fontSize = "13px";
   finishBtn.style.padding = "7px 12px";
-  finishBtn.textContent = "Lijst afronden";
+  finishBtn.textContent = t("finishListBtn");
   finishBtn.addEventListener("click", async () => {
     finishBtn.disabled = true;
     await backend.finishList(list.id);
-    showToast("Lijst afgerond ✅");
+    showToast(t("listFinishedToast"));
     const unavailableCount = list.items.filter((i) => i.unavailable).length;
     notifyListChange({
-      title: `Lijst afgerond: ${list.subject}`,
-      body: `${checked}/${total} gepakt${unavailableCount ? `, ${unavailableCount} niet beschikbaar` : ""}`,
+      title: t("listFinishedNotifTitle", { subject: subjectDisplayLabel(list.subject) }),
+      body: t("listFinishedNotifBody", {
+        checked, total,
+        unavailSuffix: unavailableCount ? t("unavailSuffix", { count: unavailableCount }) : ""
+      }),
       listId: list.id,
       role: "maker"
     });
@@ -1228,7 +1366,7 @@ function renderShopItem(list, item) {
     a.target = "_blank";
     a.rel = "noopener noreferrer";
     a.className = "shop-item-link";
-    a.textContent = "🔗 bekijk product";
+    a.textContent = t("viewProductLink");
     body.appendChild(a);
   }
 
@@ -1238,7 +1376,7 @@ function renderShopItem(list, item) {
   if (!item.unavailable) {
     const flagBtn = document.createElement("button");
     flagBtn.className = "btn-warning";
-    flagBtn.textContent = "⚠️ Niet beschikbaar";
+    flagBtn.textContent = t("markUnavailableBtn");
     flagBtn.addEventListener("click", () => {
       body.appendChild(renderFeedbackInput(list, item));
       flagBtn.hidden = true;
@@ -1247,12 +1385,12 @@ function renderShopItem(list, item) {
   } else {
     const note = document.createElement("div");
     note.className = "unavailable-note";
-    note.textContent = "⚠️ Niet beschikbaar" + (item.feedback ? ": " + item.feedback : "");
+    note.textContent = t("unavailableLabel") + (item.feedback ? ": " + item.feedback : "");
     body.appendChild(note);
 
     const undoBtn = document.createElement("button");
     undoBtn.className = "btn-secondary";
-    undoBtn.textContent = "↩️ Toch beschikbaar";
+    undoBtn.textContent = t("undoUnavailableBtn");
     undoBtn.addEventListener("click", () => {
       item.unavailable = false;
       item.feedback = "";
@@ -1276,10 +1414,10 @@ function renderFeedbackInput(list, item) {
   wrap.className = "feedback-input";
   const input = document.createElement("input");
   input.type = "text";
-  input.placeholder = "Reden (optioneel), bv. 'op = op'";
+  input.placeholder = t("feedbackPlaceholder");
   const confirmBtn = document.createElement("button");
   confirmBtn.className = "btn btn-danger";
-  confirmBtn.textContent = "Meld";
+  confirmBtn.textContent = t("reportBtn");
   confirmBtn.addEventListener("click", () => {
     item.unavailable = true;
     item.feedback = input.value.trim();
@@ -1299,8 +1437,9 @@ function persistItems(list) {
 --------------------------------------------------------- */
 
 function formatDate(date) {
-  return date.toLocaleDateString("nl-NL", { day: "numeric", month: "short" }) +
-    ", " + date.toLocaleTimeString("nl-NL", { hour: "2-digit", minute: "2-digit" });
+  const locale = DATE_LOCALES[LANG] || "nl-NL";
+  return date.toLocaleDateString(locale, { day: "numeric", month: "short" }) +
+    ", " + date.toLocaleTimeString(locale, { hour: "2-digit", minute: "2-digit" });
 }
 
 function escapeHtml(str) {
@@ -1324,7 +1463,7 @@ function persistMembers() {
     members: groupMembers.map((m) => ({ id: m.id, name: m.name.trim(), emoji: m.emoji }))
   }).catch((err) => {
     console.error(err);
-    showToast("Opslaan mislukt ⚠️");
+    showToast(t("saveFailedToast"));
   });
 }
 
@@ -1357,9 +1496,9 @@ document.getElementById("close-groupsettings-btn").addEventListener("click", () 
 document.getElementById("copy-current-code-btn").addEventListener("click", async () => {
   try {
     await navigator.clipboard.writeText(formatCode(groupCode));
-    showToast("Code gekopieerd 📋");
+    showToast(t("codeCopied"));
   } catch {
-    showToast("Kopiëren niet gelukt — noteer 'm handmatig");
+    showToast(t("copyFailedNote"));
   }
 });
 
@@ -1370,7 +1509,7 @@ document.getElementById("manage-add-member-btn").addEventListener("click", () =>
 });
 
 document.getElementById("leave-group-btn").addEventListener("click", () => {
-  if (!confirm("Weet je zeker dat je deze groep wilt verlaten? Je lijstjes blijven bewaard — met de code kun je altijd weer terug.")) return;
+  if (!confirm(t("leaveGroupConfirmText"))) return;
   localStorage.removeItem(GROUP_KEY);
   location.reload();
 });

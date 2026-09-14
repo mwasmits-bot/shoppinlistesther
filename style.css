@@ -708,3 +708,38 @@ ul.item-draft-list li:last-child { border-bottom: none; }
 .member-manage-row input[type="text"] {
   flex: 1;
 }
+
+/* ---------------------------------------------------------
+   TAALSCHAKELAAR — altijd zichtbaar, ongeacht welk scherm actief is
+--------------------------------------------------------- */
+
+.lang-switch {
+  position: fixed;
+  bottom: 16px;
+  right: 16px;
+  z-index: 200;
+  display: flex;
+  gap: 4px;
+  background: rgba(36, 31, 51, 0.85);
+  backdrop-filter: blur(6px);
+  border-radius: 999px;
+  padding: 4px;
+  box-shadow: 0 4px 14px rgba(0,0,0,0.2);
+}
+
+.lang-switch button {
+  border: none;
+  background: transparent;
+  color: rgba(255,255,255,0.7);
+  padding: 6px 10px;
+  border-radius: 999px;
+  font-size: 12px;
+  font-weight: 700;
+  font-family: var(--font-display);
+  cursor: pointer;
+}
+
+.lang-switch button.active {
+  background: white;
+  color: var(--primary-dark);
+}

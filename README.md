@@ -117,6 +117,10 @@ groep die dezelfde app-installatie gebruikt.
   emoji wijzigen, verwijderen), of verlaat de groep (je lijstjes blijven bewaard — met de code kun
   je altijd terug).
 - De app onthoudt op elk toestel welke rol (Maak lijst/Winkelen) je laatst gebruikte.
+- **Taal**: rechtsonder staat een NL/DE/EN-schakelaar. De keuze wordt per toestel onthouden (elk
+  toestel kan een andere taal hebben, ook binnen dezelfde groep) en werkt de hele app door — ideaal
+  als een vriendengroep in een andere taal wil meedoen. Nieuwe vertalingen toevoegen kan in
+  [`i18n.js`](i18n.js).
 
 ## Zonder Firebase testen
 
