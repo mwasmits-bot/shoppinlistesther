@@ -25,9 +25,12 @@ exports.handler = async (event) => {
     return { statusCode: 400, body: "Invalid JSON" };
   }
 
-  const { title, body, url } = payload;
+  const { title, body, url, groupCode } = payload;
   if (!title) {
     return { statusCode: 400, body: "Missing title" };
+  }
+  if (!groupCode) {
+    return { statusCode: 400, body: "Missing groupCode" };
   }
 
   try {
@@ -38,7 +41,9 @@ exports.handler = async (event) => {
     );
 
     const db = getDb();
-    const snap = await db.collection("pushSubscriptions").get();
+    // Elke groep heeft zijn eigen abonnees, zodat groepen elkaars meldingen
+    // nooit kunnen zien of ontvangen.
+    const snap = await db.collection("groups").doc(groupCode).collection("pushSubscriptions").get();
     const notifPayload = JSON.stringify({ title, body: body || "", url: url || "./" });
 
     let sent = 0;

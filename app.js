@@ -1,29 +1,258 @@
 import { initializeApp } from "https://www.gstatic.com/firebasejs/10.13.0/firebase-app.js";
 import {
-  getFirestore, collection, addDoc, doc, setDoc, updateDoc, deleteDoc, onSnapshot,
+  getFirestore, collection, addDoc, doc, getDoc, setDoc, updateDoc, deleteDoc, onSnapshot,
   query, where, orderBy, serverTimestamp
 } from "https://www.gstatic.com/firebasejs/10.13.0/firebase-firestore.js";
 
 const CFG = window.APP_CONFIG;
 const STORES = ["Aldi", "Albert Heijn", "Plus", "Jumbo", "Maakt niet uit", "Anders"];
-/* Toewijzen gebeurt per product/taak (subtask), niet op het hele
-   lijstje — met een "alles toewijzen"-snelkoppeling als bulk-optie. */
-const ASSIGNEE_EMOJI = { esther: "👸", michael: "👨‍🔧" };
-const ASSIGNEE_NAMES = { esther: "Esther", michael: "Michael" };
+const EMOJI_CHOICES = ["👸", "🤴", "🧑‍🚀", "👩‍🍳", "👨‍🔧", "🧑‍💻", "🐱", "🐶", "🦄", "🌟", "❤️", "😎", "🥳", "🍕", "⚽️", "🎨"];
+
+const usingFirestore = Boolean(CFG.firebase.apiKey);
+const fbApp = usingFirestore ? initializeApp(CFG.firebase) : null;
+const fbDb = fbApp ? getFirestore(fbApp) : null;
+
+/* showToast staat hier vroeg in het bestand (niet pas onderaan) omdat de
+   groeps-onboarding hieronder 'm al kan aanroepen terwijl de rest van het
+   script nog "on hold" staat achter de top-level await. */
+let toastTimer;
+function showToast(msg, duration = 3000) {
+  const el = document.getElementById("toast");
+  el.textContent = msg;
+  el.classList.add("show");
+  clearTimeout(toastTimer);
+  toastTimer = setTimeout(() => el.classList.remove("show"), duration);
+}
+
+/* ---------------------------------------------------------
+   GROEP — de app is gescheiden per groep (gezin/vriendengroep).
+   Een groepscode werkt als gedeeld "wachtwoord": geen accounts,
+   iedereen met de code deelt dezelfde lijstjes en leden.
+--------------------------------------------------------- */
+
+const GROUP_KEY = "boodschappenlijst_group";
+
+function normalizeCode(raw) {
+  return (raw || "").trim().toUpperCase().replace(/[^A-Z0-9]/g, "");
+}
+
+function formatCode(code) {
+  return code && code.length === 8 ? code.slice(0, 4) + "-" + code.slice(4) : code;
+}
+
+function generateGroupCode() {
+  const chars = "ABCDEFGHJKLMNPQRSTUVWXYZ23456789"; // geen 0/O/1/I, kan verward worden
+  let code = "";
+  for (let i = 0; i < 8; i++) code += chars[Math.floor(Math.random() * chars.length)];
+  return code;
+}
+
+async function readGroupMeta(code) {
+  if (usingFirestore) {
+    const snap = await getDoc(doc(fbDb, "groups", code));
+    return snap.exists() ? snap.data() : null;
+  }
+  try { return JSON.parse(localStorage.getItem(`boodschappenlijst_groupmeta_${code}`)); } catch { return null; }
+}
+
+async function writeGroupMeta(code, data) {
+  if (usingFirestore) {
+    await setDoc(doc(fbDb, "groups", code), data, { merge: true });
+  } else {
+    const current = (() => { try { return JSON.parse(localStorage.getItem(`boodschappenlijst_groupmeta_${code}`)); } catch { return null; } })() || {};
+    localStorage.setItem(`boodschappenlijst_groupmeta_${code}`, JSON.stringify({ ...current, ...data }));
+  }
+}
+
+function subscribeGroupMeta(code, cb) {
+  if (usingFirestore) {
+    return onSnapshot(doc(fbDb, "groups", code), (snap) => cb(snap.exists() ? snap.data() : null));
+  }
+  const key = `boodschappenlijst_groupmeta_${code}`;
+  const run = () => {
+    let data = null;
+    try { data = JSON.parse(localStorage.getItem(key)); } catch { /* corrupt, ignore */ }
+    cb(data);
+  };
+  run();
+  const onStorage = (e) => { if (e.key === key) run(); };
+  window.addEventListener("storage", onStorage);
+  return () => window.removeEventListener("storage", onStorage);
+}
+
+function createMemberRow(member, { onRemove, onChange }) {
+  const wrap = document.createElement("div");
+
+  const row = document.createElement("div");
+  row.className = "member-row";
+
+  const emojiBtn = document.createElement("button");
+  emojiBtn.type = "button";
+  emojiBtn.className = "member-emoji-btn";
+  emojiBtn.textContent = member.emoji;
+
+  const nameInput = document.createElement("input");
+  nameInput.type = "text";
+  nameInput.placeholder = "Naam";
+  nameInput.value = member.name;
+  nameInput.addEventListener("input", () => {
+    member.name = nameInput.value;
+    if (onChange) onChange();
+  });
+
+  const removeBtn = document.createElement("button");
+  removeBtn.type = "button";
+  removeBtn.className = "remove-x";
+  removeBtn.textContent = "✕";
+  removeBtn.addEventListener("click", onRemove);
+
+  const palette = document.createElement("div");
+  palette.className = "emoji-palette";
+  palette.hidden = true;
+  EMOJI_CHOICES.forEach((emoji) => {
+    const b = document.createElement("button");
+    b.type = "button";
+    b.textContent = emoji;
+    b.classList.toggle("active", emoji === member.emoji);
+    b.addEventListener("click", () => {
+      member.emoji = emoji;
+      emojiBtn.textContent = emoji;
+      palette.querySelectorAll("button").forEach((x) => x.classList.toggle("active", x.textContent === emoji));
+      palette.hidden = true;
+      if (onChange) onChange();
+    });
+    palette.appendChild(b);
+  });
+  emojiBtn.addEventListener("click", () => { palette.hidden = !palette.hidden; });
+
+  row.appendChild(emojiBtn);
+  row.appendChild(nameInput);
+  row.appendChild(removeBtn);
+  wrap.appendChild(row);
+  wrap.appendChild(palette);
+  return wrap;
+}
+
+function runOnboarding() {
+  return new Promise((resolve) => {
+    document.getElementById("screen-onboarding").hidden = false;
+
+    const choiceCard = document.getElementById("onboarding-choice");
+    const setupCard = document.getElementById("onboarding-setup");
+    const joinInput = document.getElementById("join-code-input");
+    const joinBtn = document.getElementById("join-group-btn");
+    const startBtn = document.getElementById("start-new-group-btn");
+    const codeDisplay = document.getElementById("new-group-code");
+    const copyBtn = document.getElementById("copy-code-btn");
+    const finishBtn = document.getElementById("finish-setup-btn");
+    const addMemberBtn = document.getElementById("add-member-btn");
+    const memberList = document.getElementById("member-setup-list");
+
+    let pendingCode = null;
+    let setupMembers = [];
+
+    function refreshFinishBtn() {
+      finishBtn.disabled = setupMembers.length === 0 || setupMembers.some((m) => !m.name.trim());
+    }
+
+    function renderSetupMembers() {
+      memberList.innerHTML = "";
+      setupMembers.forEach((m, idx) => {
+        memberList.appendChild(createMemberRow(m, {
+          onRemove: () => { setupMembers.splice(idx, 1); renderSetupMembers(); },
+          onChange: refreshFinishBtn
+        }));
+      });
+      refreshFinishBtn();
+    }
+
+    function finishOnboarding(code) {
+      document.getElementById("screen-onboarding").hidden = true;
+      resolve(code);
+    }
+
+    joinBtn.addEventListener("click", async () => {
+      const code = normalizeCode(joinInput.value);
+      if (code.length < 4) { showToast("Vul een geldige groepscode in ⚠️"); return; }
+      joinBtn.disabled = true;
+      try {
+        const meta = await readGroupMeta(code);
+        if (!meta) { showToast("Groepscode niet gevonden — check de spelling ⚠️"); return; }
+        localStorage.setItem(GROUP_KEY, code);
+        finishOnboarding(code);
+      } catch (err) {
+        console.error(err);
+        showToast("Er ging iets mis ⚠️");
+      } finally {
+        joinBtn.disabled = false;
+      }
+    });
+
+    startBtn.addEventListener("click", () => {
+      pendingCode = generateGroupCode();
+      codeDisplay.textContent = formatCode(pendingCode);
+      setupMembers = [
+        { id: crypto.randomUUID(), name: "", emoji: EMOJI_CHOICES[0] },
+        { id: crypto.randomUUID(), name: "", emoji: EMOJI_CHOICES[1] }
+      ];
+      renderSetupMembers();
+      choiceCard.hidden = true;
+      setupCard.hidden = false;
+    });
+
+    copyBtn.addEventListener("click", async () => {
+      try {
+        await navigator.clipboard.writeText(formatCode(pendingCode));
+        showToast("Code gekopieerd 📋");
+      } catch {
+        showToast("Kopiëren niet gelukt — noteer 'm handmatig");
+      }
+    });
+
+    addMemberBtn.addEventListener("click", () => {
+      setupMembers.push({ id: crypto.randomUUID(), name: "", emoji: EMOJI_CHOICES[setupMembers.length % EMOJI_CHOICES.length] });
+      renderSetupMembers();
+    });
+
+    finishBtn.addEventListener("click", async () => {
+      finishBtn.disabled = true;
+      try {
+        await writeGroupMeta(pendingCode, {
+          members: setupMembers.map((m) => ({ id: m.id, name: m.name.trim(), emoji: m.emoji })),
+          createdAt: new Date().toISOString()
+        });
+        localStorage.setItem(GROUP_KEY, pendingCode);
+        finishOnboarding(pendingCode);
+      } catch (err) {
+        console.error(err);
+        showToast("Aanmaken mislukt ⚠️");
+        finishBtn.disabled = false;
+      }
+    });
+  });
+}
+
+let groupCode = localStorage.getItem(GROUP_KEY);
+if (!groupCode) {
+  groupCode = await runOnboarding();
+}
+document.getElementById("app-root").hidden = false;
+
+let groupMembers = [];
 
 function createAssigneeToggle(currentValue, onSet) {
   const group = document.createElement("div");
   group.className = "button-group compact emoji-only";
-  Object.entries(ASSIGNEE_EMOJI).forEach(([value, emoji]) => {
+  groupMembers.forEach((m) => {
     const btn = document.createElement("button");
     btn.type = "button";
-    btn.textContent = emoji;
-    btn.title = ASSIGNEE_NAMES[value];
-    btn.setAttribute("aria-label", ASSIGNEE_NAMES[value]);
-    btn.classList.toggle("active", currentValue === value);
+    btn.textContent = m.emoji;
+    btn.title = m.name;
+    btn.setAttribute("aria-label", m.name);
+    btn.classList.toggle("active", currentValue === m.id);
     btn.addEventListener("click", (e) => {
       e.stopPropagation();
-      onSet(currentValue === value ? null : value);
+      onSet(currentValue === m.id ? null : m.id);
     });
     group.appendChild(btn);
   });
@@ -47,13 +276,15 @@ function createBulkAssignRow(items, onApplyAll) {
 /* ---------------------------------------------------------
    BACKEND — Firestore wanneer geconfigureerd, anders een
    localStorage-fallback zodat de app meteen te testen is.
+   Alles hangt onder groups/{groupCode}, zodat groepen elkaars
+   lijstjes en meldingen nooit zien.
 --------------------------------------------------------- */
 
 class FirestoreBackend {
-  constructor() {
-    const app = initializeApp(CFG.firebase);
-    this.db = getFirestore(app);
-    this.col = collection(this.db, "lists");
+  constructor(db, groupCode) {
+    this.db = db;
+    this.col = collection(db, "groups", groupCode, "lists");
+    this.subsCol = collection(db, "groups", groupCode, "pushSubscriptions");
   }
 
   async createList(data) {
@@ -100,14 +331,14 @@ class FirestoreBackend {
   }
 
   async savePushSubscription(id, subscription) {
-    await setDoc(doc(this.db, "pushSubscriptions", id), {
+    await setDoc(doc(this.subsCol, id), {
       ...subscription,
       updatedAt: serverTimestamp()
     });
   }
 
   async deletePushSubscription(id) {
-    await deleteDoc(doc(this.db, "pushSubscriptions", id));
+    await deleteDoc(doc(this.subsCol, id));
   }
 }
 
@@ -123,19 +354,18 @@ function normalize(id, data) {
   };
 }
 
-const LOCAL_KEY = "boodschappenlijst_lists";
-
 class LocalBackend {
-  constructor() {
+  constructor(groupCode) {
+    this.key = `boodschappenlijst_lists_${groupCode}`;
     window.addEventListener("storage", (e) => {
-      if (e.key === LOCAL_KEY) this._notify();
+      if (e.key === this.key) this._notify();
     });
     this._listeners = [];
   }
 
   _read() {
     try {
-      const raw = JSON.parse(localStorage.getItem(LOCAL_KEY) || "[]");
+      const raw = JSON.parse(localStorage.getItem(this.key) || "[]");
       return raw.map((l) => ({
         ...l,
         createdAt: l.createdAt ? new Date(l.createdAt) : null,
@@ -147,7 +377,7 @@ class LocalBackend {
   }
 
   _writeRaw(lists) {
-    localStorage.setItem(LOCAL_KEY, JSON.stringify(lists));
+    localStorage.setItem(this.key, JSON.stringify(lists));
     this._notify();
   }
 
@@ -156,7 +386,7 @@ class LocalBackend {
   }
 
   async createList(data) {
-    const raw = JSON.parse(localStorage.getItem(LOCAL_KEY) || "[]");
+    const raw = JSON.parse(localStorage.getItem(this.key) || "[]");
     const id = crypto.randomUUID();
     raw.push({ ...data, id, status: "open", createdAt: new Date().toISOString(), finishedAt: null });
     this._writeRaw(raw);
@@ -178,25 +408,25 @@ class LocalBackend {
   }
 
   async updateItems(id, items) {
-    const raw = JSON.parse(localStorage.getItem(LOCAL_KEY) || "[]");
+    const raw = JSON.parse(localStorage.getItem(this.key) || "[]");
     const list = raw.find((l) => l.id === id);
     if (list) { list.items = items; this._writeRaw(raw); }
   }
 
   async finishList(id) {
-    const raw = JSON.parse(localStorage.getItem(LOCAL_KEY) || "[]");
+    const raw = JSON.parse(localStorage.getItem(this.key) || "[]");
     const list = raw.find((l) => l.id === id);
     if (list) { list.status = "finished"; list.finishedAt = new Date().toISOString(); this._writeRaw(raw); }
   }
 
   async reopenList(id) {
-    const raw = JSON.parse(localStorage.getItem(LOCAL_KEY) || "[]");
+    const raw = JSON.parse(localStorage.getItem(this.key) || "[]");
     const list = raw.find((l) => l.id === id);
     if (list) { list.status = "open"; list.finishedAt = null; this._writeRaw(raw); }
   }
 
   async deleteList(id) {
-    const raw = JSON.parse(localStorage.getItem(LOCAL_KEY) || "[]");
+    const raw = JSON.parse(localStorage.getItem(this.key) || "[]");
     this._writeRaw(raw.filter((l) => l.id !== id));
   }
 
@@ -207,8 +437,7 @@ class LocalBackend {
   async deletePushSubscription() {}
 }
 
-const usingFirestore = Boolean(CFG.firebase.apiKey);
-const backend = usingFirestore ? new FirestoreBackend() : new LocalBackend();
+const backend = usingFirestore ? new FirestoreBackend(fbDb, groupCode) : new LocalBackend(groupCode);
 
 if (!usingFirestore) {
   document.getElementById("config-banner").hidden = false;
@@ -337,6 +566,7 @@ async function notifyListChange({ title, body, listId, role = "shopper" }) {
       body: JSON.stringify({
         title,
         body,
+        groupCode,
         url: `${location.pathname}?role=${role}${listId ? "&list=" + listId : ""}`
       })
     });
@@ -629,8 +859,24 @@ function setHistoryAssigneeFilter(value) {
   assigneeFilterEl.querySelectorAll("button").forEach((b) => b.classList.toggle("active", b.dataset.assignee === value));
   renderHistory();
 }
-assigneeFilterEl.querySelectorAll("button").forEach((b) => b.addEventListener("click", () => setHistoryAssigneeFilter(b.dataset.assignee)));
+assigneeFilterEl.querySelectorAll("button[data-assignee]").forEach((b) => b.addEventListener("click", () => setHistoryAssigneeFilter(b.dataset.assignee)));
 setHistoryAssigneeFilter("all");
+
+const assigneeFilterMembersEl = document.getElementById("assignee-filter-members");
+function renderAssigneeFilterButtons() {
+  assigneeFilterMembersEl.innerHTML = "";
+  groupMembers.forEach((m) => {
+    const btn = document.createElement("button");
+    btn.type = "button";
+    btn.textContent = m.emoji;
+    btn.title = m.name;
+    btn.setAttribute("aria-label", m.name);
+    btn.dataset.assignee = m.id;
+    btn.classList.toggle("active", historyAssigneeFilter === m.id);
+    btn.addEventListener("click", () => setHistoryAssigneeFilter(m.id));
+    assigneeFilterMembersEl.appendChild(btn);
+  });
+}
 
 clearFinishedBtn.addEventListener("click", async () => {
   const finished = lastHistoryLists.filter((l) => l.status === "finished");
@@ -863,10 +1109,11 @@ const shopperLists = document.getElementById("shopper-lists");
 const shopperEmpty = document.getElementById("shopper-empty");
 const highlightId = params.get("list");
 
-backend.subscribeOpenLists((lists) => {
+let lastShopperLists = [];
+function renderShopperLists() {
   shopperLists.innerHTML = "";
-  shopperEmpty.hidden = lists.length > 0;
-  lists.forEach((list) => {
+  shopperEmpty.hidden = lastShopperLists.length > 0;
+  lastShopperLists.forEach((list) => {
     const card = renderShopperCard(list);
     shopperLists.appendChild(card);
   });
@@ -874,6 +1121,11 @@ backend.subscribeOpenLists((lists) => {
     const el = document.getElementById("list-" + highlightId);
     if (el) el.scrollIntoView({ behavior: "smooth", block: "start" });
   }
+}
+
+backend.subscribeOpenLists((lists) => {
+  lastShopperLists = lists;
+  renderShopperLists();
 });
 
 function renderShopperCard(list) {
@@ -1057,11 +1309,78 @@ function escapeHtml(str) {
   return div.innerHTML;
 }
 
-let toastTimer;
-function showToast(msg, duration = 3000) {
-  const el = document.getElementById("toast");
-  el.textContent = msg;
-  el.classList.add("show");
-  clearTimeout(toastTimer);
-  toastTimer = setTimeout(() => el.classList.remove("show"), duration);
+
+/* ---------------------------------------------------------
+   GROEP-INSTELLINGEN (code bekijken, leden beheren, verlaten)
+--------------------------------------------------------- */
+
+const groupInfoBtn = document.getElementById("group-info-btn");
+const screenGroupSettings = document.getElementById("screen-groupsettings");
+const appRoot = document.getElementById("app-root");
+const memberManageList = document.getElementById("member-manage-list");
+
+function persistMembers() {
+  writeGroupMeta(groupCode, {
+    members: groupMembers.map((m) => ({ id: m.id, name: m.name.trim(), emoji: m.emoji }))
+  }).catch((err) => {
+    console.error(err);
+    showToast("Opslaan mislukt ⚠️");
+  });
 }
+
+function renderMemberManageList() {
+  memberManageList.innerHTML = "";
+  groupMembers.forEach((m, idx) => {
+    memberManageList.appendChild(createMemberRow(m, {
+      onRemove: () => {
+        groupMembers.splice(idx, 1);
+        persistMembers();
+        renderMemberManageList();
+      },
+      onChange: persistMembers
+    }));
+  });
+}
+
+groupInfoBtn.addEventListener("click", () => {
+  document.getElementById("current-group-code").textContent = formatCode(groupCode);
+  renderMemberManageList();
+  appRoot.hidden = true;
+  screenGroupSettings.hidden = false;
+});
+
+document.getElementById("close-groupsettings-btn").addEventListener("click", () => {
+  screenGroupSettings.hidden = true;
+  appRoot.hidden = false;
+});
+
+document.getElementById("copy-current-code-btn").addEventListener("click", async () => {
+  try {
+    await navigator.clipboard.writeText(formatCode(groupCode));
+    showToast("Code gekopieerd 📋");
+  } catch {
+    showToast("Kopiëren niet gelukt — noteer 'm handmatig");
+  }
+});
+
+document.getElementById("manage-add-member-btn").addEventListener("click", () => {
+  groupMembers.push({ id: crypto.randomUUID(), name: "", emoji: EMOJI_CHOICES[groupMembers.length % EMOJI_CHOICES.length] });
+  persistMembers();
+  renderMemberManageList();
+});
+
+document.getElementById("leave-group-btn").addEventListener("click", () => {
+  if (!confirm("Weet je zeker dat je deze groep wilt verlaten? Je lijstjes blijven bewaard — met de code kun je altijd weer terug.")) return;
+  localStorage.removeItem(GROUP_KEY);
+  location.reload();
+});
+
+/* Leden live synchroniseren tussen toestellen */
+subscribeGroupMeta(groupCode, (meta) => {
+  groupMembers = (meta && Array.isArray(meta.members)) ? meta.members : [];
+  renderAssigneeFilterButtons();
+  renderDraftList();
+  renderHistory();
+  renderShopperLists();
+  if (!screenGroupSettings.hidden) renderMemberManageList();
+});

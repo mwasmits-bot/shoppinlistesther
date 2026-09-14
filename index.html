@@ -17,13 +17,82 @@
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Baloo+2:wght@500;600;700;800&display=swap">
-<link rel="stylesheet" href="style.css?v=15">
+<link rel="stylesheet" href="style.css?v=16">
 </head>
 <body>
 
+<!-- ============== ONBOARDING (groep kiezen/aanmaken) ============== -->
+<section id="screen-onboarding" hidden>
+  <header class="app-header">
+    <h1><span class="wave">🛒</span> Ons Lijstje</h1>
+  </header>
+  <main>
+    <div class="card" id="onboarding-choice">
+      <h2>Welkom! 👋</h2>
+      <p class="meta">Deze app werkt per groep (bijv. jullie gezin, of een groep vrienden). Heb je
+        al een groepscode gekregen, vul 'm hieronder in. Nog geen groep? Maak er zelf een aan.</p>
+
+      <label for="join-code-input">Groepscode invoeren</label>
+      <input type="text" id="join-code-input" placeholder="Bijv. WOLF-4821" autocapitalize="characters">
+      <button type="button" class="btn btn-primary btn-block" id="join-group-btn">Doe mee met deze groep</button>
+
+      <div class="or-divider">— of —</div>
+
+      <button type="button" class="btn btn-secondary btn-block" id="start-new-group-btn">🆕 Nieuwe groep starten</button>
+    </div>
+
+    <div class="card" id="onboarding-setup" hidden>
+      <h2>Jullie groep is aangemaakt 🎉</h2>
+      <p class="meta">Deel deze code met iedereen die ook toegang moet krijgen:</p>
+      <div class="group-code-display" id="new-group-code"></div>
+      <button type="button" class="btn btn-secondary btn-block" id="copy-code-btn">📋 Code kopiëren</button>
+
+      <label style="margin-top:22px;">Wie gebruikt de app?</label>
+      <p class="meta" style="margin-top:0;">Voeg tenminste 1 iemand toe — dit zijn de mensen die je kunt
+        toewijzen aan producten/taken.</p>
+      <div id="member-setup-list"></div>
+      <button type="button" class="btn btn-secondary" id="add-member-btn" style="margin-top:8px;">+ Iemand toevoegen</button>
+
+      <button type="button" class="btn btn-primary btn-block" id="finish-setup-btn" style="margin-top:20px;" disabled>Start de app 🚀</button>
+    </div>
+  </main>
+</section>
+
+<!-- ============== GROEP-INSTELLINGEN ============== -->
+<section id="screen-groupsettings" hidden>
+  <header class="app-header">
+    <h1><span class="wave">👥</span> Groep</h1>
+    <div class="header-actions">
+      <button type="button" class="icon-btn" id="close-groupsettings-btn" title="Terug">✕</button>
+    </div>
+  </header>
+  <main>
+    <div class="card">
+      <h2>Jullie groepscode</h2>
+      <p class="meta">Deel deze code met iedereen die ook toegang moet krijgen tot dezelfde lijstjes:</p>
+      <div class="group-code-display" id="current-group-code"></div>
+      <button type="button" class="btn btn-secondary btn-block" id="copy-current-code-btn">📋 Code kopiëren</button>
+    </div>
+    <div class="card">
+      <h2>Leden</h2>
+      <div id="member-manage-list"></div>
+      <button type="button" class="btn btn-secondary" id="manage-add-member-btn" style="margin-top:8px;">+ Iemand toevoegen</button>
+    </div>
+    <div class="card">
+      <h2>Andere groep</h2>
+      <p class="meta">Weet je zeker dat je wilt overstappen? Je lijstjes blijven bestaan onder de
+        oude code — met die code kun je altijd weer terug.</p>
+      <button type="button" class="btn btn-danger btn-block" id="leave-group-btn">🚪 Deze groep verlaten</button>
+    </div>
+  </main>
+</section>
+
+<!-- ============== HOOFDAPP ============== -->
+<div id="app-root" hidden>
 <header class="app-header">
   <h1><span class="wave">🛒</span> Ons Lijstje</h1>
   <div class="header-actions">
+    <button type="button" id="group-info-btn" class="icon-btn" title="Groep">👥</button>
     <button type="button" id="push-toggle-btn" class="icon-btn" title="Meldingen aanzetten" hidden>🔕</button>
     <div class="role-switch">
       <button data-role="maker">Maak lijst</button>
@@ -96,8 +165,7 @@
       <label class="meta" style="margin:0 0 6px;">Filter op toegewezene</label>
       <div class="button-group" id="assignee-filter" style="margin-bottom:14px;">
         <button type="button" data-assignee="all">Alle</button>
-        <button type="button" data-assignee="esther" title="Esther" aria-label="Esther">👸</button>
-        <button type="button" data-assignee="michael" title="Michael" aria-label="Michael">👨‍🔧</button>
+        <span id="assignee-filter-members" style="display:contents;"></span>
         <button type="button" data-assignee="none">Niet toegewezen</button>
       </div>
       <button type="button" id="clear-finished-btn" class="btn btn-danger" style="margin-bottom:14px;" hidden>🗑️ Wis alle afgeronde lijstjes</button>
@@ -112,10 +180,11 @@
     <p class="empty-state" id="shopper-empty">Geen actieve lijstjes op dit moment. 🎉</p>
   </section>
 </main>
+</div>
 
 <div class="toast" id="toast"></div>
 
 <script src="config.js?v=8"></script>
-<script type="module" src="app.js?v=16"></script>
+<script type="module" src="app.js?v=19"></script>
 </body>
 </html>
