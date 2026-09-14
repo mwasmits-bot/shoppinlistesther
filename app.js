@@ -214,10 +214,6 @@ if (!usingFirestore) {
   document.getElementById("config-banner").hidden = false;
 }
 
-if (CFG.emailjs.publicKey && window.emailjs) {
-  window.emailjs.init({ publicKey: CFG.emailjs.publicKey });
-}
-
 /* ---------------------------------------------------------
    ROL (maker / shopper)
 --------------------------------------------------------- */
@@ -584,8 +580,6 @@ sendListBtn.addEventListener("click", async () => {
 
   try {
     const id = await backend.createList({ subject, store, items: draftItems });
-    const link = `${location.origin}${location.pathname}?role=shopper&list=${id}`;
-    const emailResult = await sendNotificationEmail({ subject, store, items: draftItems }, link);
     notifyListChange({
       title: `Nieuw lijstje: ${subject}`,
       body: `${store ? store + " · " : ""}${draftItems.length} ding(en)`,
@@ -600,13 +594,7 @@ sendListBtn.addEventListener("click", async () => {
     customSubjectInput.value = "";
     clearDraft();
 
-    if (emailResult.sent) {
-      showToast("Lijst verstuurd en mail verzonden ✅");
-    } else if (emailResult.reason === "not-configured") {
-      showToast("Lijst verstuurd (mail niet ingesteld — zie README)");
-    } else {
-      showToast("Lijst verstuurd, maar mail versturen mislukte ⚠️");
-    }
+    showToast("Lijst verstuurd ✅");
   } catch (err) {
     console.error(err);
     showToast("Er ging iets mis bij het versturen ⚠️");
@@ -615,27 +603,6 @@ sendListBtn.addEventListener("click", async () => {
     sendListBtn.textContent = "📤 Lijst versturen";
   }
 });
-
-async function sendNotificationEmail(list, link) {
-  const cfg = CFG.emailjs;
-  if (!cfg.publicKey || !cfg.serviceId || !cfg.templateId || !window.emailjs) {
-    return { sent: false, reason: "not-configured" };
-  }
-  try {
-    await window.emailjs.send(cfg.serviceId, cfg.templateId, {
-      to_email: cfg.toEmail,
-      subject: list.subject,
-      store: list.store || "",
-      item_count: String(list.items.length),
-      items_text: list.items.map((i) => "- " + i.name).join("\n"),
-      link
-    });
-    return { sent: true };
-  } catch (err) {
-    console.error("EmailJS error:", err);
-    return { sent: false, reason: err.message || "error" };
-  }
-}
 
 /* Geschiedenis voor de maker */
 const historyList = document.getElementById("history-list");
