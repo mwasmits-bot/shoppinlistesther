@@ -1665,7 +1665,15 @@ subscribeGroupMeta(groupCode, (meta) => {
   renderHistory();
   renderShopperLists();
   if (!screenGroupSettings.hidden) {
-    renderMemberManageList();
-    renderStoreManageList();
+    // Niet herbouwen terwijl iemand middenin het typen zit in een van deze
+    // lijsten (bijv. eigen wijziging die via persistMembers/persistStores
+    // net is teruggekomen) — dat vernietigt het actieve inputveld en
+    // verbreekt daarmee de focus/het toetsenbord op mobiel.
+    if (!memberManageList.contains(document.activeElement)) {
+      renderMemberManageList();
+    }
+    if (!storeManageList.contains(document.activeElement)) {
+      renderStoreManageList();
+    }
   }
 });
