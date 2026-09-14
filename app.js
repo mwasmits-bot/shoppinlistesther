@@ -380,6 +380,14 @@ STORES.forEach((s) => {
   storeButtons.appendChild(btn);
 });
 
+const ITEM_PLACEHOLDERS = {
+  "Boodschappen": "Bijv. Melk",
+  "Klusjes / Meenemen": "Bijv. Paspoort meenemen",
+  "Tuin / Huis": "Bijv. Gras maaien",
+  "Cadeaus": "Bijv. LEGO-set",
+  "Overig": "Naam item"
+};
+
 function setSubject(value) {
   subjectSelect.value = value;
   subjectButtons.querySelectorAll("button").forEach((b) => {
@@ -387,6 +395,10 @@ function setSubject(value) {
   });
   storeWrap.hidden = value !== "Boodschappen";
   customSubjectWrap.hidden = value !== "Overig";
+  itemNameInput.placeholder = ITEM_PLACEHOLDERS[value] || "Naam item";
+  // Bij cadeaus is een link naar het product zo waardevol dat we het
+  // invoerveld meteen openklappen in plaats van achter een toggle te verstoppen.
+  itemExtraWrap.hidden = value !== "Cadeaus";
   saveDraft();
 }
 
