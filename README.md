@@ -123,8 +123,10 @@ groep die dezelfde app-installatie gebruikt.
   gebeurt).
 - **"Winkelen"**: je ziet alle actieve lijstjes, vinkt producten af terwijl je ze pakt, wijst
   toe/herwijs toe aan een groepslid, en kunt een product als **"⚠️ Niet beschikbaar"** melden met
-  een kort briefje. Met de kleine **"Lijst afronden"**-knop sluit je de lijst af (en kun je 'm in
-  de "Klaar"-tab weer heropenen als dat per ongeluk was).
+  een kort briefje. Ook hier kun je aan het **⠿-greepje** slepen om de volgorde te wijzigen en
+  naar links vegen (met bevestigingsvraag) om een product te verwijderen. Met de kleine
+  **"Lijst afronden"**-knop sluit je de lijst af (en kun je 'm in de "Klaar"-tab weer heropenen
+  als dat per ongeluk was).
 - **👥-knop rechtsboven**: bekijk/kopieer de groepscode, wijzig de **taal** van de groep, beheer de
   **leden** (toevoegen, hernoemen, emoji wijzigen, verwijderen), pas de **winkels** aan, of verlaat
   de groep (je lijstjes blijven bewaard — met de code kun je altijd terug). Wijzig je de taal, dan

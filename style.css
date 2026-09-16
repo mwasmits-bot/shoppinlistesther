@@ -350,7 +350,7 @@ ul.item-draft-list li:last-child { border-bottom: none; }
   background: var(--card);
   touch-action: pan-y;
 }
-.draggable-row.dragging {
+.dragging {
   position: relative;
   z-index: 5;
   box-shadow: 0 6px 16px rgba(36, 31, 51, 0.18);

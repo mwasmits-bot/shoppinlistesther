@@ -1582,7 +1582,7 @@ function renderShopperCard(list) {
 
   const itemsWrap = document.createElement("div");
   list.items.forEach((item) => {
-    itemsWrap.appendChild(renderShopItem(list, item));
+    itemsWrap.appendChild(renderShopItem(list, item, itemsWrap));
   });
   card.appendChild(itemsWrap);
 
@@ -1622,7 +1622,7 @@ function renderShopperCard(list) {
   return card;
 }
 
-function renderShopItem(list, item) {
+function renderShopItem(list, item, container) {
   const row = document.createElement("div");
   row.className = "shop-item" + (item.checked ? " checked" : "") + (item.unavailable ? " unavailable" : "");
 
@@ -1700,7 +1700,27 @@ function renderShopItem(list, item) {
   }));
 
   body.appendChild(actions);
-  row.appendChild(body);
+
+  const dragHandle = createDragHandle();
+  const swipeWrap = wrapSwipeToDelete([checkbox, body], () => {
+    if (!confirm(t("removeItemConfirm", { name: item.name }))) return;
+    const updated = list.items.filter((i) => i.id !== item.id);
+    backend.updateItems(list.id, updated).catch((err) => {
+      console.error(err);
+      showToast(t("removeItemFailedToast"));
+    });
+  });
+  swipeWrap.querySelector(".swipe-content").style.alignItems = "flex-start";
+
+  attachDragReorder(dragHandle, row, container, item, list.items, () => {
+    backend.updateItems(list.id, list.items).catch((err) => {
+      console.error(err);
+      showToast(t("reorderFailedToast"));
+    });
+  });
+
+  row.appendChild(dragHandle);
+  row.appendChild(swipeWrap);
   return row;
 }
 
