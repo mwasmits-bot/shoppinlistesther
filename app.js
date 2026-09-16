@@ -929,10 +929,18 @@ itemNameInput.addEventListener("keydown", (e) => {
   if (e.key === "Enter") { e.preventDefault(); addDraftItem(); }
 });
 
+function moveDraftItem(idx, delta) {
+  const target = idx + delta;
+  if (target < 0 || target >= draftItems.length) return;
+  [draftItems[idx], draftItems[target]] = [draftItems[target], draftItems[idx]];
+  renderDraftList();
+  saveDraft();
+}
+
 function renderDraftList() {
   draftList.innerHTML = "";
   draftEmpty.hidden = draftItems.length > 0;
-  draftItems.forEach((item) => {
+  draftItems.forEach((item, idx) => {
     const li = document.createElement("li");
     const left = document.createElement("span");
     left.style.display = "flex";
@@ -962,6 +970,26 @@ function renderDraftList() {
       renderDraftList();
       saveDraft();
     }));
+
+    const reorderWrap = document.createElement("span");
+    reorderWrap.className = "reorder-controls";
+    const upBtn = document.createElement("button");
+    upBtn.type = "button";
+    upBtn.className = "reorder-btn";
+    upBtn.title = t("moveUpTitle");
+    upBtn.textContent = "▲";
+    upBtn.disabled = idx === 0;
+    upBtn.addEventListener("click", () => moveDraftItem(idx, -1));
+    const downBtn = document.createElement("button");
+    downBtn.type = "button";
+    downBtn.className = "reorder-btn";
+    downBtn.title = t("moveDownTitle");
+    downBtn.textContent = "▼";
+    downBtn.disabled = idx === draftItems.length - 1;
+    downBtn.addEventListener("click", () => moveDraftItem(idx, 1));
+    reorderWrap.appendChild(upBtn);
+    reorderWrap.appendChild(downBtn);
+    right.appendChild(reorderWrap);
 
     const removeBtn = document.createElement("button");
     removeBtn.className = "remove-x";
@@ -1187,7 +1215,7 @@ function renderHistory() {
     const detail = document.createElement("div");
     detail.style.padding = "0 0 12px 18px";
     detail.hidden = !expanded;
-    list.items.forEach((item) => {
+    list.items.forEach((item, idx) => {
       const line = document.createElement("div");
       line.style.fontSize = "14px";
       line.style.padding = "4px 0";
@@ -1209,6 +1237,60 @@ function renderHistory() {
           showToast(t("assignFailedToast"));
         });
       }));
+
+      if (list.status === "open") {
+        const reorderWrap = document.createElement("span");
+        reorderWrap.className = "reorder-controls";
+        const upBtn = document.createElement("button");
+        upBtn.type = "button";
+        upBtn.className = "reorder-btn";
+        upBtn.title = t("moveUpTitle");
+        upBtn.textContent = "▲";
+        upBtn.disabled = idx === 0;
+        upBtn.addEventListener("click", (e) => {
+          e.stopPropagation();
+          const updated = [...list.items];
+          [updated[idx - 1], updated[idx]] = [updated[idx], updated[idx - 1]];
+          backend.updateItems(list.id, updated).catch((err) => {
+            console.error(err);
+            showToast(t("reorderFailedToast"));
+          });
+        });
+        const downBtn = document.createElement("button");
+        downBtn.type = "button";
+        downBtn.className = "reorder-btn";
+        downBtn.title = t("moveDownTitle");
+        downBtn.textContent = "▼";
+        downBtn.disabled = idx === list.items.length - 1;
+        downBtn.addEventListener("click", (e) => {
+          e.stopPropagation();
+          const updated = [...list.items];
+          [updated[idx + 1], updated[idx]] = [updated[idx], updated[idx + 1]];
+          backend.updateItems(list.id, updated).catch((err) => {
+            console.error(err);
+            showToast(t("reorderFailedToast"));
+          });
+        });
+        reorderWrap.appendChild(upBtn);
+        reorderWrap.appendChild(downBtn);
+        line.appendChild(reorderWrap);
+
+        const removeItemBtn = document.createElement("button");
+        removeItemBtn.type = "button";
+        removeItemBtn.className = "remove-x";
+        removeItemBtn.title = t("removeItemTitle");
+        removeItemBtn.textContent = "✕";
+        removeItemBtn.addEventListener("click", (e) => {
+          e.stopPropagation();
+          if (!confirm(t("removeItemConfirm", { name: item.name }))) return;
+          const updated = list.items.filter((i) => i.id !== item.id);
+          backend.updateItems(list.id, updated).catch((err) => {
+            console.error(err);
+            showToast(t("removeItemFailedToast"));
+          });
+        });
+        line.appendChild(removeItemBtn);
+      }
 
       if (item.unavailable) {
         const note = document.createElement("div");

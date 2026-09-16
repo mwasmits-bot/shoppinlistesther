@@ -116,6 +116,11 @@ groep die dezelfde app-installatie gebruikt.
 - **"Maak lijst"**: onderwerp kiezen (Boodschappen + winkel, Klusjes, Tuin/Huis, Cadeaus, of
   Overig), producten toevoegen (met optioneel een link of foto-URL), eventueel toewijzen aan een
   groepslid, en versturen. De rest van de groep krijgt dan een pushmelding (zie stap 3 hierboven).
+  Met de **▲▼-knoppen** naast elk product bepaal je de volgorde (bovenaan = hoogste prioriteit) —
+  dit kan zowel in het concept vóór het versturen, als achteraf via de geschiedenis bij een lijstje
+  dat nog **Actief** is. Een product per ongeluk toegevoegd? Klap het lijstje open in "Eerder
+  verstuurd" en verwijder 'm met **✕** (met een bevestigingsvraag om te voorkomen dat dit per
+  ongeluk gebeurt).
 - **"Winkelen"**: je ziet alle actieve lijstjes, vinkt producten af terwijl je ze pakt, wijst
   toe/herwijs toe aan een groepslid, en kunt een product als **"⚠️ Niet beschikbaar"** melden met
   een kort briefje. Met de kleine **"Lijst afronden"**-knop sluit je de lijst af (en kun je 'm in
