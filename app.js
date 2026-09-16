@@ -461,6 +461,189 @@ function createBulkAssignRow(items, onApplyAll) {
 }
 
 /* ---------------------------------------------------------
+   DRAG & SWIPE — herbruikbare gebaren voor het herordenen van
+   items (sleepgreep, ⠿) en het verwijderen ervan (naar links
+   vegen). Gebouwd op Pointer Events zodat hetzelfde op zowel
+   muis als touch (iPhone) werkt.
+--------------------------------------------------------- */
+
+/* Versleept `row` verticaal binnen `container` zodra je op `handle`
+   drukt; de onderliggende `arr` (draftItems of list.items) wordt
+   tijdens het slepen al in-place mee omgewisseld, zodat bij loslaten
+   alleen nog persistentie (`onDrop`) nodig is. */
+function attachDragReorder(handle, row, container, item, arr, onDrop) {
+  let dragging = false;
+  let pointerId = null;
+  let startY = 0;
+  let initialOffsetTop = 0;
+
+  function swapNeighbor(direction) {
+    const idx = arr.indexOf(item);
+    const targetIdx = idx + direction;
+    if (idx === -1 || targetIdx < 0 || targetIdx >= arr.length) return;
+    [arr[idx], arr[targetIdx]] = [arr[targetIdx], arr[idx]];
+  }
+
+  // offsetTop is een layout-eigenschap en verandert niet door transform;
+  // door het verschil met de startpositie van de pointer af te trekken,
+  // "springt" de rij niet zodra we 'm in de DOM verplaatsen (zie onMove).
+  function applyTransform(e) {
+    const pointerDelta = e.clientY - startY;
+    const layoutDelta = row.offsetTop - initialOffsetTop;
+    row.style.transform = `translateY(${pointerDelta - layoutDelta}px)`;
+  }
+
+  function onDown(e) {
+    if (e.pointerType === "mouse" && e.button !== 0) return;
+    dragging = true;
+    pointerId = e.pointerId;
+    startY = e.clientY;
+    initialOffsetTop = row.offsetTop;
+    row.classList.add("dragging");
+    handle.setPointerCapture(pointerId);
+    e.preventDefault();
+    e.stopPropagation();
+  }
+
+  function onMove(e) {
+    if (!dragging || e.pointerId !== pointerId) return;
+    e.preventDefault();
+    e.stopPropagation();
+    applyTransform(e);
+    let moved = true;
+    while (moved) {
+      moved = false;
+      const rowRect = row.getBoundingClientRect();
+      const rowCenter = rowRect.top + rowRect.height / 2;
+      const prev = row.previousElementSibling;
+      if (prev) {
+        const pr = prev.getBoundingClientRect();
+        if (rowCenter < pr.top + pr.height / 2) {
+          container.insertBefore(row, prev);
+          swapNeighbor(-1);
+          moved = true;
+        }
+      }
+      if (!moved) {
+        const next = row.nextElementSibling;
+        if (next) {
+          const nr = next.getBoundingClientRect();
+          if (rowCenter > nr.top + nr.height / 2) {
+            container.insertBefore(next, row);
+            swapNeighbor(1);
+            moved = true;
+          }
+        }
+      }
+      if (moved) applyTransform(e);
+    }
+  }
+
+  function onUp(e) {
+    if (!dragging || e.pointerId !== pointerId) return;
+    dragging = false;
+    row.classList.remove("dragging");
+    row.style.transform = "";
+    try { handle.releasePointerCapture(pointerId); } catch { /* al losgelaten */ }
+    e.stopPropagation();
+    onDrop();
+  }
+
+  handle.addEventListener("pointerdown", onDown);
+  handle.addEventListener("pointermove", onMove);
+  handle.addEventListener("pointerup", onUp);
+  handle.addEventListener("pointercancel", onUp);
+}
+
+function createDragHandle() {
+  const handle = document.createElement("span");
+  handle.className = "drag-handle";
+  handle.textContent = "⠿";
+  handle.setAttribute("aria-hidden", "true");
+  return handle;
+}
+
+/* Verpakt `contentEls` in een naar-links-veegbare rij met een rode
+   prullenbak eronder. Bij een gebaar voorbij de drempel wordt
+   `onConfirmDelete` aangeroepen (die zelf eventueel nog bevestigt). */
+function wrapSwipeToDelete(contentEls, onConfirmDelete) {
+  const THRESHOLD = 72;
+
+  const wrap = document.createElement("div");
+  wrap.className = "swipe-wrap";
+
+  const bg = document.createElement("div");
+  bg.className = "swipe-bg";
+  bg.textContent = "🗑️";
+
+  const content = document.createElement("div");
+  content.className = "swipe-content";
+  contentEls.forEach((el) => content.appendChild(el));
+
+  wrap.appendChild(bg);
+  wrap.appendChild(content);
+
+  let pointerId = null;
+  let startX = 0;
+  let startY = 0;
+  let dx = 0;
+  let decided = false;
+  let isSwipe = false;
+
+  function onDown(e) {
+    if (e.pointerType === "mouse" && e.button !== 0) return;
+    pointerId = e.pointerId;
+    startX = e.clientX;
+    startY = e.clientY;
+    dx = 0;
+    decided = false;
+    isSwipe = false;
+    content.style.transition = "none";
+  }
+
+  function onMove(e) {
+    if (e.pointerId !== pointerId) return;
+    const deltaX = e.clientX - startX;
+    const deltaY = e.clientY - startY;
+    if (!decided) {
+      if (Math.abs(deltaX) < 8 && Math.abs(deltaY) < 8) return;
+      decided = true;
+      isSwipe = Math.abs(deltaX) > Math.abs(deltaY);
+      // Pas nu pointer capturen: bij een verticale scrollbeweging laten we
+      // het gebaar gewoon door naar de pagina in plaats van 'm te kapen.
+      if (isSwipe) content.setPointerCapture(pointerId);
+    }
+    if (!isSwipe) return;
+    e.preventDefault();
+    dx = Math.min(0, deltaX);
+    content.style.transform = `translateX(${dx}px)`;
+    bg.classList.toggle("armed", dx <= -THRESHOLD);
+  }
+
+  function onUp(e) {
+    if (e.pointerId !== pointerId) return;
+    pointerId = null;
+    if (isSwipe) {
+      content.style.transition = "";
+      content.style.transform = "";
+      const armed = dx <= -THRESHOLD;
+      bg.classList.remove("armed");
+      dx = 0;
+      if (armed) onConfirmDelete();
+    }
+    decided = false;
+    isSwipe = false;
+  }
+
+  content.addEventListener("pointerdown", onDown);
+  content.addEventListener("pointermove", onMove);
+  content.addEventListener("pointerup", onUp);
+  content.addEventListener("pointercancel", onUp);
+
+  return wrap;
+}
+
+/* ---------------------------------------------------------
    BACKEND — Firestore wanneer geconfigureerd, anders een
    localStorage-fallback zodat de app meteen te testen is.
    Alles hangt onder groups/{groupCode}, zodat groepen elkaars
@@ -929,19 +1112,13 @@ itemNameInput.addEventListener("keydown", (e) => {
   if (e.key === "Enter") { e.preventDefault(); addDraftItem(); }
 });
 
-function moveDraftItem(idx, delta) {
-  const target = idx + delta;
-  if (target < 0 || target >= draftItems.length) return;
-  [draftItems[idx], draftItems[target]] = [draftItems[target], draftItems[idx]];
-  renderDraftList();
-  saveDraft();
-}
-
 function renderDraftList() {
   draftList.innerHTML = "";
   draftEmpty.hidden = draftItems.length > 0;
-  draftItems.forEach((item, idx) => {
+  draftItems.forEach((item) => {
     const li = document.createElement("li");
+    li.className = "draggable-row";
+
     const left = document.createElement("span");
     left.style.display = "flex";
     left.style.alignItems = "center";
@@ -971,38 +1148,20 @@ function renderDraftList() {
       saveDraft();
     }));
 
-    const reorderWrap = document.createElement("span");
-    reorderWrap.className = "reorder-controls";
-    const upBtn = document.createElement("button");
-    upBtn.type = "button";
-    upBtn.className = "reorder-btn";
-    upBtn.title = t("moveUpTitle");
-    upBtn.textContent = "▲";
-    upBtn.disabled = idx === 0;
-    upBtn.addEventListener("click", () => moveDraftItem(idx, -1));
-    const downBtn = document.createElement("button");
-    downBtn.type = "button";
-    downBtn.className = "reorder-btn";
-    downBtn.title = t("moveDownTitle");
-    downBtn.textContent = "▼";
-    downBtn.disabled = idx === draftItems.length - 1;
-    downBtn.addEventListener("click", () => moveDraftItem(idx, 1));
-    reorderWrap.appendChild(upBtn);
-    reorderWrap.appendChild(downBtn);
-    right.appendChild(reorderWrap);
-
-    const removeBtn = document.createElement("button");
-    removeBtn.className = "remove-x";
-    removeBtn.textContent = "✕";
-    removeBtn.addEventListener("click", () => {
+    const dragHandle = createDragHandle();
+    const swipeWrap = wrapSwipeToDelete([left, right], () => {
       draftItems = draftItems.filter((i) => i.id !== item.id);
       renderDraftList();
       saveDraft();
     });
-    right.appendChild(removeBtn);
 
-    li.appendChild(left);
-    li.appendChild(right);
+    attachDragReorder(dragHandle, li, draftList, item, draftItems, () => {
+      renderDraftList();
+      saveDraft();
+    });
+
+    li.appendChild(dragHandle);
+    li.appendChild(swipeWrap);
     draftList.appendChild(li);
   });
   sendListBtn.disabled = draftItems.length === 0;
@@ -1215,73 +1374,38 @@ function renderHistory() {
     const detail = document.createElement("div");
     detail.style.padding = "0 0 12px 18px";
     detail.hidden = !expanded;
-    list.items.forEach((item, idx) => {
-      const line = document.createElement("div");
-      line.style.fontSize = "14px";
-      line.style.padding = "4px 0";
-      line.style.display = "flex";
-      line.style.alignItems = "center";
-      line.style.flexWrap = "wrap";
-      line.style.gap = "8px";
 
+    const itemsListEl = document.createElement("div");
+    list.items.forEach((item) => {
       const text = document.createElement("span");
       text.style.flex = "1";
       text.style.minWidth = "0";
       text.innerHTML = `${item.checked ? "✅" : "⬜"} ${escapeHtml(item.name)}`;
-      line.appendChild(text);
 
-      line.appendChild(createAssigneeToggle(item.assignee, (value) => {
+      const assigneeToggle = createAssigneeToggle(item.assignee, (value) => {
         item.assignee = value;
         backend.updateItems(list.id, list.items).catch((err) => {
           console.error(err);
           showToast(t("assignFailedToast"));
         });
-      }));
+      });
+
+      const contentEls = [text, assigneeToggle];
+      if (item.unavailable) {
+        const note = document.createElement("div");
+        note.className = "unavailable-note";
+        note.style.marginTop = "2px";
+        note.style.width = "100%";
+        note.textContent = t("unavailableLabel") + (item.feedback ? ": " + item.feedback : "");
+        contentEls.push(note);
+      }
 
       if (list.status === "open") {
-        const reorderWrap = document.createElement("span");
-        reorderWrap.className = "reorder-controls";
-        const upBtn = document.createElement("button");
-        upBtn.type = "button";
-        upBtn.className = "reorder-btn";
-        upBtn.title = t("moveUpTitle");
-        upBtn.textContent = "▲";
-        upBtn.disabled = idx === 0;
-        upBtn.addEventListener("click", (e) => {
-          e.stopPropagation();
-          const updated = [...list.items];
-          [updated[idx - 1], updated[idx]] = [updated[idx], updated[idx - 1]];
-          backend.updateItems(list.id, updated).catch((err) => {
-            console.error(err);
-            showToast(t("reorderFailedToast"));
-          });
-        });
-        const downBtn = document.createElement("button");
-        downBtn.type = "button";
-        downBtn.className = "reorder-btn";
-        downBtn.title = t("moveDownTitle");
-        downBtn.textContent = "▼";
-        downBtn.disabled = idx === list.items.length - 1;
-        downBtn.addEventListener("click", (e) => {
-          e.stopPropagation();
-          const updated = [...list.items];
-          [updated[idx + 1], updated[idx]] = [updated[idx], updated[idx + 1]];
-          backend.updateItems(list.id, updated).catch((err) => {
-            console.error(err);
-            showToast(t("reorderFailedToast"));
-          });
-        });
-        reorderWrap.appendChild(upBtn);
-        reorderWrap.appendChild(downBtn);
-        line.appendChild(reorderWrap);
+        const line = document.createElement("div");
+        line.className = "draggable-row";
 
-        const removeItemBtn = document.createElement("button");
-        removeItemBtn.type = "button";
-        removeItemBtn.className = "remove-x";
-        removeItemBtn.title = t("removeItemTitle");
-        removeItemBtn.textContent = "✕";
-        removeItemBtn.addEventListener("click", (e) => {
-          e.stopPropagation();
+        const dragHandle = createDragHandle();
+        const swipeWrap = wrapSwipeToDelete(contentEls, () => {
           if (!confirm(t("removeItemConfirm", { name: item.name }))) return;
           const updated = list.items.filter((i) => i.id !== item.id);
           backend.updateItems(list.id, updated).catch((err) => {
@@ -1289,19 +1413,30 @@ function renderHistory() {
             showToast(t("removeItemFailedToast"));
           });
         });
-        line.appendChild(removeItemBtn);
-      }
 
-      if (item.unavailable) {
-        const note = document.createElement("div");
-        note.className = "unavailable-note";
-        note.style.marginTop = "2px";
-        note.style.width = "100%";
-        note.textContent = t("unavailableLabel") + (item.feedback ? ": " + item.feedback : "");
-        line.appendChild(note);
+        attachDragReorder(dragHandle, line, itemsListEl, item, list.items, () => {
+          backend.updateItems(list.id, list.items).catch((err) => {
+            console.error(err);
+            showToast(t("reorderFailedToast"));
+          });
+        });
+
+        line.appendChild(dragHandle);
+        line.appendChild(swipeWrap);
+        itemsListEl.appendChild(line);
+      } else {
+        const line = document.createElement("div");
+        line.style.fontSize = "14px";
+        line.style.padding = "4px 0";
+        line.style.display = "flex";
+        line.style.alignItems = "center";
+        line.style.flexWrap = "wrap";
+        line.style.gap = "8px";
+        contentEls.forEach((el) => line.appendChild(el));
+        itemsListEl.appendChild(line);
       }
-      detail.appendChild(line);
     });
+    detail.appendChild(itemsListEl);
 
     if (list.items.length > 0) {
       detail.appendChild(createBulkAssignRow(list.items, (value) => {
