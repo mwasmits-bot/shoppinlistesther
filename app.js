@@ -48,6 +48,30 @@ const LANG = detectLang();
 const STRINGS = window.I18N[LANG] || window.I18N.nl;
 const DATE_LOCALES = { nl: "nl-NL", de: "de-DE", en: "en-GB" };
 
+/* ---------------------------------------------------------
+   WEERGAVE (licht/donker) — bewust een instelling per toestel, niet
+   per groep zoals de taal: smaak voor licht/donker verschilt nu
+   eenmaal per persoon/telefoon, dus hoeft niet gedeeld te worden.
+   index.html zet data-theme al vóór dit script laadt (voorkomt een
+   lichte flits); hier alleen nog de theme-color-meta bijwerken en
+   de instellingenknoppen aansturen.
+--------------------------------------------------------- */
+const THEME_KEY = "boodschappenlijst_theme";
+const SUPPORTED_THEMES = ["light", "dark"];
+
+function detectTheme() {
+  const saved = localStorage.getItem(THEME_KEY);
+  return SUPPORTED_THEMES.includes(saved) ? saved : "light";
+}
+
+function applyTheme(theme) {
+  document.documentElement.dataset.theme = theme;
+  const meta = document.querySelector('meta[name="theme-color"]');
+  if (meta) meta.content = theme === "dark" ? "#000000" : "#16c46f";
+}
+
+applyTheme(detectTheme());
+
 function t(key, vars) {
   let s = STRINGS[key] ?? window.I18N.nl[key] ?? key;
   if (vars) {
@@ -90,6 +114,9 @@ function applyStaticTranslations() {
   setText("txt-share-code-same-lists", "shareCodeSameLists");
   setText("copy-current-code-btn", "copyCodeBtn");
   setText("txt-choose-language-2", "chooseLanguage");
+  setText("txt-display-title", "displayTitle");
+  document.querySelector('#theme-buttons [data-theme="light"]').textContent = t("themeLight");
+  document.querySelector('#theme-buttons [data-theme="dark"]').textContent = t("themeDark");
   setText("txt-members-title", "membersTitle");
   document.getElementById("manage-add-member-btn").textContent = t("addMemberBtn");
   setText("txt-stores-title-2", "storesTitle");
@@ -1828,9 +1855,12 @@ function renderStoreManageList() {
   });
 }
 
+const themeButtons = document.getElementById("theme-buttons");
+
 groupInfoBtn.addEventListener("click", () => {
   document.getElementById("current-group-code").textContent = formatCode(groupCode);
   settingsLangButtons.querySelectorAll("button").forEach((b) => b.classList.toggle("active", b.dataset.lang === LANG));
+  themeButtons.querySelectorAll("button").forEach((b) => b.classList.toggle("active", b.dataset.theme === detectTheme()));
   renderMemberManageList();
   renderStoreManageList();
   appRoot.hidden = true;
@@ -1850,6 +1880,15 @@ settingsLangButtons.querySelectorAll("button").forEach((b) => {
         console.error(err);
         showToast(t("saveFailedToast"));
       });
+  });
+});
+
+themeButtons.querySelectorAll("button").forEach((b) => {
+  b.addEventListener("click", () => {
+    const theme = b.dataset.theme;
+    localStorage.setItem(THEME_KEY, theme);
+    applyTheme(theme);
+    themeButtons.querySelectorAll("button").forEach((x) => x.classList.toggle("active", x.dataset.theme === theme));
   });
 });
 

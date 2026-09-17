@@ -17,7 +17,18 @@
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Baloo+2:wght@500;600;700;800&display=swap">
-<link rel="stylesheet" href="style.css?v=21">
+<link rel="stylesheet" href="style.css?v=22">
+<script>
+// Zet het donkere thema (indien gekozen) al vóór de eerste render, anders
+// flitst de pagina eerst kort licht op voordat app.js kan bijsturen.
+(function () {
+  try {
+    if (localStorage.getItem("boodschappenlijst_theme") === "dark") {
+      document.documentElement.dataset.theme = "dark";
+    }
+  } catch (e) { /* privénavigatie o.i.d. — dan gewoon licht opstarten */ }
+})();
+</script>
 </head>
 <body>
 
@@ -91,6 +102,13 @@
         <button type="button" data-lang="nl">Nederlands</button>
         <button type="button" data-lang="de">Deutsch</button>
         <button type="button" data-lang="en">English</button>
+      </div>
+    </div>
+    <div class="card">
+      <h2 id="txt-display-title">Weergave</h2>
+      <div class="button-group" id="theme-buttons">
+        <button type="button" data-theme="light">☀️ Licht</button>
+        <button type="button" data-theme="dark">🌙 Donker</button>
       </div>
     </div>
     <div class="card">
@@ -210,7 +228,7 @@
 <div class="toast" id="toast"></div>
 
 <script src="config.js?v=8"></script>
-<script src="i18n.js?v=4"></script>
-<script type="module" src="app.js?v=30"></script>
+<script src="i18n.js?v=5"></script>
+<script type="module" src="app.js?v=31"></script>
 </body>
 </html>

@@ -127,11 +127,16 @@ groep die dezelfde app-installatie gebruikt.
   naar links vegen (met bevestigingsvraag) om een product te verwijderen. Met de kleine
   **"Lijst afronden"**-knop sluit je de lijst af (en kun je 'm in de "Klaar"-tab weer heropenen
   als dat per ongeluk was).
-- **👥-knop rechtsboven**: bekijk/kopieer de groepscode, wijzig de **taal** van de groep, beheer de
-  **leden** (toevoegen, hernoemen, emoji wijzigen, verwijderen), pas de **winkels** aan, of verlaat
-  de groep (je lijstjes blijven bewaard — met de code kun je altijd terug). Wijzig je de taal, dan
-  herladen alle toestellen in de groep automatisch mee naar de nieuwe taal.
+- **👥-knop rechtsboven**: bekijk/kopieer de groepscode, wijzig de **taal** van de groep, kies
+  **Licht ☀️ of Donker 🌙** (zie hieronder), beheer de **leden** (toevoegen, hernoemen, emoji
+  wijzigen, verwijderen), pas de **winkels** aan, of verlaat de groep (je lijstjes blijven bewaard
+  — met de code kun je altijd terug). Wijzig je de taal, dan herladen alle toestellen in de groep
+  automatisch mee naar de nieuwe taal.
 - De app onthoudt op elk toestel welke rol (Maak lijst/Winkelen) je laatst gebruikte.
+
+**Donkere modus** is — anders dan de taal — bewust een instelling **per toestel**, niet per groep:
+smaak voor licht/donker verschilt nu eenmaal per persoon. Kies 'm via 👥 → Weergave; de keuze wordt
+op dat toestel onthouden en is meteen zichtbaar, zonder herladen.
 
 Nieuwe taal toevoegen kan in [`i18n.js`](i18n.js) (kopieer een taalblok, vertaal de waardes, voeg
 de taalcode toe aan `SUPPORTED_LANGS` in `app.js` en een knop in de twee taal-keuzeblokken in
