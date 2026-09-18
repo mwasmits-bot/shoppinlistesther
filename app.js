@@ -141,6 +141,8 @@ function applyStaticTranslations() {
   document.querySelector('#subject-buttons [data-value="Overig"]').textContent = t("subjectOther");
   setText("txt-description-label", "descriptionLabel");
   setPlaceholder("custom-subject-input", "descriptionPlaceholder");
+  setText("txt-gift-for-label", "giftForFieldLabel");
+  setPlaceholder("gift-for-input", "giftForPlaceholder");
   setText("txt-store-label", "storeLabel");
   setText("txt-which-store-label", "whichStoreLabel");
   setPlaceholder("store-other-input", "storeNamePlaceholder");
@@ -744,6 +746,7 @@ function normalize(id, data) {
     id,
     subject: data.subject,
     store: data.store || null,
+    giftFor: data.giftFor || null,
     items: data.items || [],
     status: data.status,
     createdAt: data.createdAt?.toDate ? data.createdAt.toDate() : (data.createdAt ? new Date(data.createdAt) : null),
@@ -993,6 +996,8 @@ const storeOtherWrap = document.getElementById("store-other-wrap");
 const storeOtherInput = document.getElementById("store-other-input");
 const customSubjectWrap = document.getElementById("custom-subject-wrap");
 const customSubjectInput = document.getElementById("custom-subject-input");
+const giftForWrap = document.getElementById("gift-for-wrap");
+const giftForInput = document.getElementById("gift-for-input");
 
 /* Winkels zijn per groep instelbaar (zie groupStores) — de knoppenrij
    wordt daarom herbouwd zodra de groepsinstellingen binnenkomen/wijzigen,
@@ -1035,6 +1040,14 @@ function subjectDisplayLabel(subject) {
   }
 }
 
+/* Winkel (Boodschappen) en ontvanger (Cadeaus) verschijnen op dezelfde
+   plek naast het onderwerp — sluiten elkaar uit, dus hier gebundeld. */
+function listSubjectSuffix(list) {
+  if (list.store) return " · " + list.store;
+  if (list.giftFor) return " · " + t("giftForLabel", { name: list.giftFor });
+  return "";
+}
+
 function setSubject(value) {
   subjectSelect.value = value;
   subjectButtons.querySelectorAll("button").forEach((b) => {
@@ -1042,6 +1055,7 @@ function setSubject(value) {
   });
   storeWrap.hidden = value !== "Boodschappen";
   customSubjectWrap.hidden = value !== "Overig";
+  giftForWrap.hidden = value !== "Cadeaus";
   itemNameInput.placeholder = itemPlaceholderFor(value);
   // Bij cadeaus is een link naar het product zo waardevol dat we het
   // invoerveld meteen openklappen in plaats van achter een toggle te verstoppen.
@@ -1064,6 +1078,7 @@ subjectButtons.querySelectorAll("button").forEach((b) => {
 
 storeOtherInput.addEventListener("input", saveDraft);
 customSubjectInput.addEventListener("input", saveDraft);
+giftForInput.addEventListener("input", saveDraft);
 
 const itemNameInput = document.getElementById("item-name-input");
 const itemExtraToggle = document.getElementById("item-extra-toggle");
@@ -1088,6 +1103,7 @@ function saveDraft() {
     store: storeSelect.value,
     storeOther: storeOtherInput.value,
     customSubject: customSubjectInput.value,
+    giftFor: giftForInput.value,
     items: draftItems
   }));
 }
@@ -1099,6 +1115,7 @@ function loadDraft() {
     draftItems = Array.isArray(draft.items) ? draft.items : [];
     storeOtherInput.value = draft.storeOther || "";
     customSubjectInput.value = draft.customSubject || "";
+    giftForInput.value = draft.giftFor || "";
   }
   setSubject((draft && draft.subject) || "Boodschappen");
   setStore((draft && draft.store) || "");
@@ -1215,6 +1232,7 @@ clearDraftBtn.addEventListener("click", () => {
   setStore("");
   storeOtherInput.value = "";
   customSubjectInput.value = "";
+  giftForInput.value = "";
   clearDraft();
   renderDraftList();
 });
@@ -1231,15 +1249,17 @@ sendListBtn.addEventListener("click", async () => {
       : storeSelect.value === STORE_ANY ? t("storeAny")
       : storeSelect.value;
   }
+  const giftFor = subjectSelect.value === "Cadeaus" ? giftForInput.value.trim() : null;
 
   sendListBtn.disabled = true;
   sendListBtn.textContent = t("sendingBtn");
 
   try {
-    const id = await backend.createList({ subject, store, items: draftItems });
+    const id = await backend.createList({ subject, store, giftFor, items: draftItems });
+    const contextPrefix = store ? store + " · " : giftFor ? t("giftForLabel", { name: giftFor }) + " · " : "";
     notifyListChange({
       title: t("newListNotifTitle", { subject: subjectDisplayLabel(subject) }),
-      body: t("newListNotifBody", { storePrefix: store ? store + " · " : "", count: draftItems.length }),
+      body: t("newListNotifBody", { storePrefix: contextPrefix, count: draftItems.length }),
       listId: id
     });
 
@@ -1249,6 +1269,7 @@ sendListBtn.addEventListener("click", async () => {
     setStore("");
     storeOtherInput.value = "";
     customSubjectInput.value = "";
+    giftForInput.value = "";
     clearDraft();
 
     showToast(t("listSentToast"));
@@ -1345,7 +1366,7 @@ function renderHistory() {
     const unavailableCount = list.items.filter((i) => i.unavailable).length;
     const expanded = expandedHistoryIds.has(list.id);
     row.innerHTML = `
-      <span>${expanded ? "▾" : "▸"} ${escapeHtml(subjectDisplayLabel(list.subject))}${list.store ? " · " + escapeHtml(list.store) : ""}
+      <span>${expanded ? "▾" : "▸"} ${escapeHtml(subjectDisplayLabel(list.subject))}${escapeHtml(listSubjectSuffix(list))}
         <span class="meta">(${checkedCount}/${list.items.length}${unavailableCount ? `, <span style="color:var(--danger); font-weight:600;">${t("unavailableCountLabel", { count: unavailableCount })}</span>` : ""})</span>
       </span>
     `;
@@ -1385,7 +1406,7 @@ function renderHistory() {
       delBtn.textContent = "🗑️";
       delBtn.addEventListener("click", async (e) => {
         e.stopPropagation();
-        if (!confirm(t("deleteConfirm", { name: `${subjectDisplayLabel(list.subject)}${list.store ? " · " + list.store : ""}` }))) return;
+        if (!confirm(t("deleteConfirm", { name: `${subjectDisplayLabel(list.subject)}${listSubjectSuffix(list)}` }))) return;
         try {
           await backend.deleteList(list.id);
         } catch (err) {
@@ -1598,7 +1619,7 @@ function renderShopperCard(list) {
   header.innerHTML = `
     <div class="list-card-header">
       <div>
-        <span class="subject-tag">${escapeHtml(subjectDisplayLabel(list.subject))}${list.store ? " · " + escapeHtml(list.store) : ""}</span>
+        <span class="subject-tag">${escapeHtml(subjectDisplayLabel(list.subject))}${escapeHtml(listSubjectSuffix(list))}</span>
       </div>
       <span class="meta">${list.createdAt ? formatDate(list.createdAt) : ""}</span>
     </div>

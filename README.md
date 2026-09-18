@@ -115,7 +115,9 @@ groep die dezelfde app-installatie gebruikt.
   De groepscode wordt op het toestel onthouden; je hoeft 'm maar één keer in te vullen.
 - **"Maak lijst"**: onderwerp kiezen (Boodschappen + winkel, Klusjes, Tuin/Huis, Cadeaus, of
   Overig), producten toevoegen (met optioneel een link of foto-URL), eventueel toewijzen aan een
-  groepslid, en versturen. De rest van de groep krijgt dan een pushmelding (zie stap 3 hierboven).
+  groepslid, en versturen. Bij **Cadeaus** kun je erbij zetten voor wie het cadeau is — dat
+  verschijnt daarna overal waar de lijst wordt getoond (bijv. "Cadeaus · Voor Esther"). De rest
+  van de groep krijgt dan een pushmelding (zie stap 3 hierboven).
   Sleep een product aan het **⠿-greepje** om de volgorde te bepalen (bovenaan = hoogste
   prioriteit) — dit kan zowel in het concept vóór het versturen, als achteraf via de geschiedenis
   bij een lijstje dat nog **Actief** is. Een product per ongeluk toegevoegd? Veeg 'm naar links om
