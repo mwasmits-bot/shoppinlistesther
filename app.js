@@ -548,7 +548,10 @@ function attachDragReorder(handle, row, container, item, arr, onDrop) {
       if (prev) {
         const pr = prev.getBoundingClientRect();
         if (rowCenter < pr.top + pr.height / 2) {
-          container.insertBefore(row, prev);
+          // De buur verplaatsen, niet `row` zelf: een element dat uit de DOM
+          // wordt gehaald verliest zijn pointer-capture, waardoor omhoog
+          // slepen na één stap vastliep (omlaag deed dit al goed).
+          container.insertBefore(prev, row.nextElementSibling);
           swapNeighbor(-1);
           moved = true;
         }
@@ -582,6 +585,7 @@ function attachDragReorder(handle, row, container, item, arr, onDrop) {
   handle.addEventListener("pointermove", onMove);
   handle.addEventListener("pointerup", onUp);
   handle.addEventListener("pointercancel", onUp);
+  handle.addEventListener("lostpointercapture", onUp);
 }
 
 function createDragHandle() {
