@@ -418,6 +418,16 @@ ul.item-draft-list li:last-child { border-bottom: none; }
   border-radius: 10px;
 }
 
+/* iOS Safari kent alleen de -webkit-variant van user-select: zonder die
+   selecteert een lange aanraking de tekst (blauwe markering) i.p.v. te slepen. */
+.dragging,
+.dragging *,
+.swipe-content {
+  -webkit-user-select: none;
+  user-select: none;
+  -webkit-touch-callout: none;
+}
+
 .drag-handle {
   flex-shrink: 0;
   padding: 4px 8px;
@@ -426,7 +436,10 @@ ul.item-draft-list li:last-child { border-bottom: none; }
   color: var(--muted);
   cursor: grab;
   touch-action: none;
+  -webkit-user-select: none;
   user-select: none;
+  -webkit-touch-callout: none;
+  -webkit-tap-highlight-color: transparent;
 }
 .drag-handle:active { cursor: grabbing; }
 
